@@ -4,16 +4,7 @@ import feedparser
 queue = []
 
 # parse the RSS feed
-def rss(feed_link, release_group, data_dir):
-    log_file = f'{data_dir}/log/{feed_link.partition("q=")[2]}.txt'
-    try:
-        with open(log_file, 'r') as f:
-            log = f.read().splitlines()
-    except FileNotFoundError:
-        with open(log_file, 'w+') as f:
-            pass
-        log = []
-
+def rss(feed_link, ignore, log):
     rss_parser = feedparser.parse(feed_link)
 
     for torrent in rss_parser.entries:

@@ -1,0 +1,6 @@
+[submodule "deps/gdrive"]
+	path = deps/gdrive
+	url = https://github.com/MeGaNeKoS/gdrive.git
+[submodule "deps/recognition"]
+	path = deps/recognition
+	url = https://github.com/MeGaNeKoS/Anime-recognition.git

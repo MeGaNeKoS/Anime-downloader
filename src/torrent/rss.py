@@ -30,7 +30,7 @@ def rss(feed_link: str, ignore: list, log: list):
         anime = recognition.track(torrent["title"], torrent.summary.endswith(" file(s)</a>"))
 
         # skip if in ignore list,
-        if anime["'anime_title'"].lower() in ignore:
+        if anime["anime_title"].lower() in ignore:
             continue
 
         # get the magnet link

@@ -100,5 +100,5 @@ def rss(feed_link: str, ignore: list, log: list):
         queue[anime["anilist"]] = anime
 
     # update the entries
-    entries["feed_link"] = rss_parser.entries
+    entries[feed_link] = rss_parser.entries
     del log[100:]  # only save last 100 item

@@ -1,34 +1,44 @@
 import feedparser
 
+from deps.recognition import recognition
 
-queue = []
+queue = {}
+downloads = {}
+entries = {}
+
 
 # parse the RSS feed
-def rss(feed_link, ignore, log):
+def rss(feed_link: str, ignore: list, log: list):
     rss_parser = feedparser.parse(feed_link)
 
-    for torrent in rss_parser.entries:
-        with open(f'{data_dir}/ignore.txt', 'r') as f:
-            ignore = f.read().splitlines()
+    # only proceed the new entries
+    if entries.get(feed_link, None) is None:
+        # if this the first time we parse the feed, the new entries are current entries
+        new_feeds = rss_parser.entries
+    else:
+        new_feeds = set(entries[feed_link]).difference(rss_parser.entries)
 
-        # skip the anime if already downloaded or in ignore list
-        if torrent['title'] in log or any(name.lower() in torrent['title'].lower() for name in ignore):
+    for torrent in new_feeds:
+        # skip the anime if already downloaded,
+        if torrent['title'] in log:
             continue
+
+        anime = recognition.track(torrent["title"], torrent.summary.endswith(" file(s)</a>"))
+
+        # skip if in ignore list,
+        if anime["'anime_title'"].lower() in ignore:
+            continue
+
         # get the magnet link
         magnet = "magnet" + str(torrent["summary_detail"].values()).split('href="magnet')[1]
         magnet = magnet.split('">')[0]
         magnet = magnet.replace("&amp;", "&")
+        anime['link'] = magnet
+        anime['log'] = log  # this mutable,
 
-        # check if the title contains the release group
-        if torrent['title'][0] == "[" and torrent['title'][1:].lower().startswith(tuple(release_group)):
-            if torrent.summary.endswith(" file(s)</a>"):
-                status = download(magnet, False)
-            else:
-                status = download(magnet, True)
+        # add to the queue list
+        queue[anime["anilist"]] = anime
 
-            if status:
-                log.insert(0, torrent['title'])
-                del log[100:]  # only save last 100 item
-                with open(log_file, 'w+') as f:
-                    for magnet_link in log:
-                        f.write("%s\n" % magnet_link)
+    # update the entries
+    entries["feed_link"] = rss_parser.entries
+    del log[100:]  # only save last 100 item

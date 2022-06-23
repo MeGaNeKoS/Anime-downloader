@@ -26,8 +26,11 @@ def rss(feed_link: str, ignore: list, log: list):
         # skip the anime if already downloaded,
         if torrent['title'] in log:
             continue
-
-        anime = recognition.track(torrent["title"], torrent.summary.endswith(" file(s)</a>"))
+        if torrent.summary.endswith(" file(s)</a>"):
+            anime = recognition.track(torrent["title"], True)
+        else:
+            # force add an extensions since the title from torrent usually doesn't include extensions
+            anime = recognition.track(torrent["title"] + ".mkv")
 
         # skip if in ignore list,
         if anime["anime_title"].lower() in ignore:

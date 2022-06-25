@@ -30,3 +30,9 @@ LEGALIZE_CHARACTER = {':': '：',
                       '?': '？',
                       '*': '＊'
                       }
+
+# qbittorrent client
+TORRENT_WEB_CLIENT = "localhost"
+TORRENT_WEB_CLIENT_PORT = 8080
+TORRENT_WEB_CLIENT_USERNAME = "admin"
+TORRENT_WEB_CLIENT_PASSWORD = "password"

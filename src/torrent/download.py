@@ -1,6 +1,7 @@
 import logging
 import qbittorrentapi
 from src import config
+from deps.recognition import recognition
 import time
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,26 @@ def connect():
         username=config.TORRENT_WEB_CLIENT_USERNAME,
         password=config.TORRENT_WEB_CLIENT_PASSWORD,
     )
+    torrents = qbt_client.torrents_info(tag=config.CLIENT_TAG)
+    for torrent in torrents:
+        anime_id_eps = torrent['category']
+        # it's a folder
+        if len(torrent.files) != 1:
+            anime = recognition.track(torrent["name"], True)
+        else:
+            name = torrent['name']
+            for char in name[:-6:-1]:
+                # we found the file extensions in the title
+                if char == ".":
+                    anime = recognition.track(name)
+                    break
+            else:
+                # force add an extensions since the title from torrent usually doesn't include extensions
+                anime = recognition.track(name + ".mkv")
+        anime["hash"] = torrent['hash']
+        anime["status"] = "downloading"
+
+        downloads[anime_id_eps] = anime
 
 
 def add_torrent(num_retries=10):

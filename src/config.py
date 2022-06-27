@@ -32,7 +32,22 @@ LEGALIZE_CHARACTER = {':': '：',
                       }
 
 # qbittorrent client
+CLIENT_TAG = "auto add anime"
 TORRENT_WEB_CLIENT = "localhost"
 TORRENT_WEB_CLIENT_PORT = 8080
 TORRENT_WEB_CLIENT_USERNAME = "admin"
 TORRENT_WEB_CLIENT_PASSWORD = "password"
+
+# google drive id stuff
+FOLDER_LINK = {
+    "Anime": {
+        "0season": "1sZwVyck4uxkT4iTNjGXBMR4MTmXFZOnj",
+        "movie": "19ghf02sf-AMU2q2hJcx_y2N7mgazq_bB",
+        "ona": "1WRvqvZtOCzBpgfZsDQAANxFp-P3vSAJ5",
+        "ova": "1vYkcB1YzqgPF3otCZ3QNIXkWhlRkbDQe",
+        "special": "1Ux08TLqGDaKY-xQo5_vCMgClYxZJMpUX",
+        "tv": "164vTWwEibhpZPpb2rsIu2qcSmbLNMwYz",
+        "torrent": "1M7wSjpI5K0AQXHfYqo6L93M1JMQf8IiI",
+        "id": "13kayspoKTJ16a-uI_301TxP8X50TeQ0c"
+    }
+}

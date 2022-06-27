@@ -1,6 +1,6 @@
 import functools
-import config
-
+from src import config
+from src import gdrive
 LOWEST_PRIORITY = len(config.RELEASE_GROUP)
 
 
@@ -18,3 +18,42 @@ def get_priority(release_group, priority=None):
         if priority:
             return priority
         return LOWEST_PRIORITY
+
+
+def legalize(filename: str):
+    """
+    Change forbidden printable character to full width version (utf-8)
+    """
+    if filename is None:
+        return
+    for illegal, escaped in config.LEGALIZE_CHARACTER.items():
+        filename = filename.replace(illegal, escaped)
+    return filename
+
+
+def get_destination(anime: dict, path: list):
+    key = get_create_folder(config.FOLDER_LINK["Anime"][anime["anime_type"]],
+                            list(filter(None, [anime.get("anime_year"), anime.get("anime_title", None)])) + path)
+    config.FOLDER_LINK["Anime"][anime["anime_type"]] = key[0]
+    save_path = key[1]
+    return save_path
+
+
+def get_create_folder(root: dict, key: list):
+    try:
+        folder_id = root[key[0]]
+    except (KeyError, TypeError):
+        if isinstance(root, str):
+            folder_id = gdrive.create_folder(str(key[0]), root, True)
+            root = {'id': root, key[0]: folder_id}
+        else:
+            folder_id = gdrive.create_folder(str(key[0]), root['id'], True)
+            root.update({key[0]: folder_id})
+
+    if len(key) > 1:
+        new_info = get_create_folder(root[key[0]], key[1:])
+        root[key[0]] = new_info[0]
+        folder_id = new_info[1]
+    if not type(folder_id) == str:
+        folder_id = folder_id['id']
+    return root, folder_id

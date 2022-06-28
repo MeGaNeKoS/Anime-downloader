@@ -75,6 +75,9 @@ def remove(anime):
     # cancel the download, delete the local files,
     # and add the anime to the log file
     if isinstance(anime, str):
+        if (download := downloads.get(anime) is not None) and download["status"] in ["uploading", "finished"]:
+            # the file is in the upload queue, so we won't delete it
+            return False
         datas = qbt_client.torrents_info(category=anime)
         if len(datas) != 1:
             logger.error(f"More than one torrent with category {anime}, everything will be deleted")
@@ -82,11 +85,15 @@ def remove(anime):
             qbt_client.torrents_delete(delete_files=True, torrent_hashes=data['hash'])
         qbt_client.torrents_remove_categories(anime)
         with lock:
-            downloads.pop(anime, None)
+            download = downloads.pop(anime, None)
     else:
         qbt_client.torrents_delete(delete_files=True, torrent_hashes=anime['hash'])
         with lock:
-            downloads.pop(anime, None)
+            download = downloads.pop(anime, None)
+    # record the anime in the log file
+    if download is not None and download.get("log", None) is not None:
+        download["log"].insert(0, download["file_name"])
+    return True
 
 
 def upload_file(torrent, download):
@@ -120,6 +127,7 @@ def upload_file(torrent, download):
             notif_text += f"[{file_format}] "
         notif_text += f"{torrent['name']} uploaded"
         helper.discord_user_notif(notif_text, mention_owner)
+        download["status"] = "finished"
     else:
         download["status"] = "downloading"
 

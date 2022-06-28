@@ -69,7 +69,7 @@ def rss(feed_link: str, ignore: list, log: list):
                 # I don't want to make a race condition to another process
                 # better to remove then re add it again
                 queue.pop(anime["anilist"], None)
-                
+
             # check if the anime already in download list
             if waiting := downloads.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
                 # if already exist, check for the priority
@@ -80,8 +80,11 @@ def rss(feed_link: str, ignore: list, log: list):
                     if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
                         log.insert(0, torrent['title'])
                     continue
-                # remove from download list and download manager
-                download.remove(str(anime["anilist"]) + str(anime.get("episode_number", 0)))
+                # check if we can remove from download list and download manager
+                if not download.remove(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
+                    # the file already in upload/finished state
+                    log.insert(0, torrent['title'])
+                    continue
 
         # check the fansub preference from the database
         if from_db := database.db.select("preference", {"anime_id": anime["anilist"]}):

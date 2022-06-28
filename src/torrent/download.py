@@ -1,13 +1,19 @@
 import logging
-import qbittorrentapi
-from src import config
-from deps.recognition import recognition
+import threading
 import time
+
+import qbittorrentapi
+from pymediainfo import MediaInfo
+
+from deps.recognition import recognition
+from src import config
+from src import helper
+from src.torrent import upload
 
 logger = logging.getLogger(__name__)
 downloads = {}
 queue = {}
-
+finished = []
 qbt_client: qbittorrentapi.Client
 
 
@@ -68,3 +74,68 @@ def remove(anime_id):
 
     downloads.pop(anime_id, None)
 
+
+def upload_file(torrent, download):
+    status = []
+    file8bit = False
+    file_format = ""
+    for file in torrent.files:
+        # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#get-torrent-contents
+        if file.priority == 0:  # 0 mean do not download
+            continue
+        status.append(upload.upload(torrent["save_path"], file["name"]))
+        m_info = MediaInfo.parse(torrent["save_path"] + file["name"])
+        for track in m_info.tracks:
+            if track.track_type.lower() == 'video':
+                if track.bit_depth == 8:
+                    file8bit = True
+                elif track.format != "HEVC":
+                    file_format = track.format
+    if all(status):
+        logger.info(f"{torrent['name']} uploaded")
+        global finished
+        finished.append(torrent)
+        mention_owner = False
+        notif_text = ""
+        if file8bit:
+            mention_owner = True
+            notif_text += "[8bit] "
+        if file_format:
+            mention_owner = True
+            notif_text += f"[{file_format}] "
+        notif_text += f"{torrent['name']} uploaded"
+        helper.discord_user_notif(notif_text, mention_owner)
+    else:
+        download["status"] = "downloading"
+
+
+def check_completion():
+    for download in downloads:
+        if download in finished:
+            continue
+        torrent = qbt_client.torrents_info(torrent_hashes=download["hash"])
+        if len(torrent) != 1:
+            logger.error("More than one torrent with hash")
+        torrent = torrent[0]
+
+        # check if we finish download the file
+        # need to re work this
+        if torrent['amount_left'] == 0 and torrent['size'] > 0 and 'paused' not in torrent['state']:
+            if download["status"] == "downloading":
+                download["status"] = "uploading"
+                # create a new thread to upload the file
+                thread = threading.Thread(target=upload_file, args=(torrent, download), daemon=True)
+                thread.start()
+                # if the all uploaded, then remove the download to start another.
+
+            elif download["status"] == "uploading":
+                # not sure for now
+                pass
+
+    for download in finished:
+        downloads.pop(download, None)
+
+    while len(downloads) < 3:
+        add_torrent()
+
+    time.sleep(config.CHECK_INTERVAL)

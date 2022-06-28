@@ -51,3 +51,7 @@ FOLDER_LINK = {
         "id": "13kayspoKTJ16a-uI_301TxP8X50TeQ0c"
     }
 }
+
+# Discord stuff
+OWNER = ""  # Owner's discord id
+DISCORD_NOTIF = "./data/discord_notif.txt"

@@ -57,3 +57,11 @@ def get_create_folder(root: dict, key: list):
     if not type(folder_id) == str:
         folder_id = folder_id['id']
     return root, folder_id
+
+
+def discord_user_notif(msg, mention_owner=False):
+    if mention_owner:
+        msg = f"{config.OWNER} {msg}"
+    with open(config.DISCORD_NOTIF, 'a+') as out:
+        out.write(f'{msg}\n')
+    return None

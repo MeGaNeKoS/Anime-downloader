@@ -49,8 +49,11 @@ def connect():
 
 
 def add_torrent(num_retries=10):
-    anime = next(iter(queue))
-    download = queue.pop(anime)
+
+    anime = next(iter(queue), None)
+    if anime is None:
+        return
+    download = queue.pop(anime)  # guaranteed exists by the previous check
     for i in range(num_retries):
         if qbt_client.torrents_add(download["link"], tags=config.CLIENT_TAG, category=anime) == "Ok.":
             break
@@ -144,7 +147,7 @@ def check_completion():
     for download in finished:
         remove(download)
 
-    while len(downloads) < 3:
+    while len(downloads) < 3 and queue:
         add_torrent()
 
     time.sleep(config.CHECK_INTERVAL)

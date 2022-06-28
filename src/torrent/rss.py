@@ -85,7 +85,9 @@ def rss(feed_link: str, ignore: list, log: list):
 
         # check the fansub preference from the database
         if from_db := database.db.select("preference", {"anime_id": anime["anilist"]}):
-            if helper.fansub_priority(from_db[0]["release_group"], anime["release_group"]):
+            if from_db[0]["release_group"] == anime["release_group"]:
+                pass
+            elif helper.fansub_priority(from_db[0]["release_group"], anime["release_group"], equality=False):
                 # we already download this anime, but the higher priority fansub is exists,
                 # thus we skip this one and wait for that fansub
                 if torrent['title'] not in log:

@@ -5,9 +5,8 @@ from src.torrent import download
 from src import database
 from src import helper
 from src import config
+from src.share_var import queue, downloads, lock
 
-queue = {}
-downloads = {}
 entries = {}
 
 
@@ -50,38 +49,39 @@ def rss(feed_link: str, ignore: list, log: list):
         anime['link'] = magnet
         anime['log'] = log  # this mutable,
 
-        if anime.get("anime_type", "torrent").lower() == "torrent" or anime.get("anilist", 0) == 0:
-            # this anime can't be detected :( put to torrent folder instead.
-            queue[torrent['title']] = anime
-            continue
-
-        # check if the anime already in queue list
-        if waiting := queue.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
-            # if already exist, check for the fansub priority
-            if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
-                # the first fansub has higher priority
-                # so this title will not be downloaded
-                # add to log if not exist
-                if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
-                    log.insert(0, torrent['title'])
+        with lock:
+            if anime.get("anime_type", "torrent").lower() == "torrent" or anime.get("anilist", 0) == 0:
+                # this anime can't be detected :( put to torrent folder instead.
+                queue[torrent['title']] = anime
                 continue
-            # replace the queue with the new one
-            # I don't want to make a race condition to another process
-            # better to remove then re add it again
-            queue.pop(anime["anilist"], None)
 
-        # check if the anime already in download list
-        if waiting := downloads.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
-            # if already exist, check for the priority
-            if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
-                # the first fansub has higher priority
-                # so this title will not be downloaded
-                # add to log if not exist
-                if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
-                    log.insert(0, torrent['title'])
-                continue
-            # remove from download list and download manager
-            download.remove(str(anime["anilist"]) + str(anime.get("episode_number", 0)))
+            # check if the anime already in queue list
+            if waiting := queue.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
+                # if already exist, check for the fansub priority
+                if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
+                    # the first fansub has higher priority
+                    # so this title will not be downloaded
+                    # add to log if not exist
+                    if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
+                        log.insert(0, torrent['title'])
+                    continue
+                # replace the queue with the new one
+                # I don't want to make a race condition to another process
+                # better to remove then re add it again
+                queue.pop(anime["anilist"], None)
+                
+            # check if the anime already in download list
+            if waiting := downloads.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
+                # if already exist, check for the priority
+                if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
+                    # the first fansub has higher priority
+                    # so this title will not be downloaded
+                    # add to log if not exist
+                    if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
+                        log.insert(0, torrent['title'])
+                    continue
+                # remove from download list and download manager
+                download.remove(str(anime["anilist"]) + str(anime.get("episode_number", 0)))
 
         # check the fansub preference from the database
         if from_db := database.db.select("preference", {"anime_id": anime["anilist"]}):
@@ -108,8 +108,9 @@ def rss(feed_link: str, ignore: list, log: list):
             }
             database.db.insert("preference", to_db)
 
-        # add to the queue list
-        queue[str(anime["anilist"]) + str(anime.get("episode_number", 0))] = anime
+        with lock:
+            # add to the queue list
+            queue[str(anime["anilist"]) + str(anime.get("episode_number", 0))] = anime
 
     # update the entries
     entries[feed_link] = rss_parser.entries

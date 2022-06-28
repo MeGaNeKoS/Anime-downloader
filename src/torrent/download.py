@@ -9,10 +9,9 @@ from deps.recognition import recognition
 from src import config
 from src import helper
 from src.torrent import upload
+from src.share_var import queue, downloads, lock
 
 logger = logging.getLogger(__name__)
-downloads = {}
-queue = {}
 finished = []
 qbt_client: qbittorrentapi.Client
 
@@ -44,16 +43,16 @@ def connect():
                 anime = recognition.track(name + ".mkv")
         anime["hash"] = torrent['hash']
         anime["status"] = "downloading"
-
-        downloads[anime_id_eps] = anime
+        with lock:
+            downloads[anime_id_eps] = anime
 
 
 def add_torrent(num_retries=10):
-
-    anime = next(iter(queue), None)
-    if anime is None:
-        return
-    download = queue.pop(anime)  # guaranteed exists by the previous check
+    with lock:
+        anime = next(iter(queue), None)
+        if anime is None:
+            return
+        download = queue.pop(anime)  # guaranteed exists by the previous check
     for i in range(num_retries):
         if qbt_client.torrents_add(download["link"], tags=config.CLIENT_TAG, category=anime) == "Ok.":
             break
@@ -68,7 +67,8 @@ def add_torrent(num_retries=10):
     download["hash"] = data['hash']
     download["status"] = "downloading"
 
-    downloads[anime] = download
+    with lock:
+        downloads[anime] = download
 
 
 def remove(anime):
@@ -81,10 +81,12 @@ def remove(anime):
         for data in datas:  # intentional behavior
             qbt_client.torrents_delete(delete_files=True, torrent_hashes=data['hash'])
         qbt_client.torrents_remove_categories(anime)
-        downloads.pop(anime, None)
+        with lock:
+            downloads.pop(anime, None)
     else:
         qbt_client.torrents_delete(delete_files=True, torrent_hashes=anime['hash'])
-        downloads.pop(anime['category'], None)
+        with lock:
+            downloads.pop(anime, None)
 
 
 def upload_file(torrent, download):
@@ -105,8 +107,9 @@ def upload_file(torrent, download):
                     file_format = track.format
     if all(status):
         logger.info(f"{torrent['name']} uploaded")
-        global finished
-        finished.append(torrent)
+        with lock:
+            global finished
+            finished.append(download)
         mention_owner = False
         notif_text = ""
         if file8bit:
@@ -147,7 +150,8 @@ def check_completion():
     for download in finished:
         remove(download)
 
-    while len(downloads) < 3 and queue:
-        add_torrent()
+    with lock:
+        while len(downloads) < 3 and queue:
+            add_torrent()
 
     time.sleep(config.CHECK_INTERVAL)

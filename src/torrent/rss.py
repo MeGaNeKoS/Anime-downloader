@@ -56,13 +56,13 @@ def rss(feed_link: str, ignore: list, log: list):
             continue
 
         # check if the anime already in queue list
-        if waiting := queue.get(anime["anilist"]):
+        if waiting := queue.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
             # if already exist, check for the fansub priority
             if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
                 # the first fansub has higher priority
                 # so this title will not be downloaded
                 # add to log if not exist
-                if torrent['title'] not in log:
+                if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
                     log.insert(0, torrent['title'])
                 continue
             # replace the queue with the new one
@@ -71,17 +71,17 @@ def rss(feed_link: str, ignore: list, log: list):
             queue.pop(anime["anilist"], None)
 
         # check if the anime already in download list
-        if waiting := downloads.get(anime["anilist"]):
+        if waiting := downloads.get(str(anime["anilist"]) + str(anime.get("episode_number", 0))):
             # if already exist, check for the priority
             if helper.fansub_priority(waiting["release_group"], anime["release_group"]):
                 # the first fansub has higher priority
                 # so this title will not be downloaded
                 # add to log if not exist
-                if torrent['title'] not in log:
+                if anime['file_name'] != waiting['file_name'] and torrent['title'] not in log:
                     log.insert(0, torrent['title'])
                 continue
             # remove from download list and download manager
-            download.remove(anime["anilist"])
+            download.remove(str(anime["anilist"]) + str(anime.get("episode_number", 0)))
 
         # check the fansub preference from the database
         if from_db := database.db.select("preference", {"anime_id": anime["anilist"]}):
@@ -107,7 +107,7 @@ def rss(feed_link: str, ignore: list, log: list):
             database.db.insert("preference", to_db)
 
         # add to the queue list
-        queue[anime["anilist"]] = anime
+        queue[str(anime["anilist"]) + str(anime.get("episode_number", 0))] = anime
 
     # update the entries
     entries[feed_link] = rss_parser.entries

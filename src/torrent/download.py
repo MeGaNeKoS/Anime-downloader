@@ -60,7 +60,7 @@ def add_torrent(num_retries=10):
         return
     datas = qbt_client.torrents_info(category=anime)
     if len(datas) != 1:
-        logger.error("More than one torrent with category anime_id")
+        logger.error(f"More than one torrent with category {anime}")
     data = datas[0]
     download["hash"] = data['hash']
     download["status"] = "downloading"

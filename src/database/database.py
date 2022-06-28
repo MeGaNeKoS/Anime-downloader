@@ -2,10 +2,10 @@ import sqlite3
 
 
 class Sqlite:
-    def __init__(self, db_file="./data/db.sqlite"):
+    def __init__(self, db_file="./data/anime.db"):
         c = self.conn = sqlite3.connect(db_file)
 
-        c.execute('''CREATE TABLE preferrence (
+        c.execute('''CREATE TABLE IF NOT EXISTS preference (
 	anime_name text,
 	anime_id INTEGER,
 	releases_fansub text,

@@ -44,10 +44,10 @@ def get_create_folder(root: dict, key: list):
         folder_id = root[key[0]]
     except (KeyError, TypeError):
         if isinstance(root, str):
-            folder_id = gdrive.create_folder(str(key[0]), root, True)
+            folder_id = gdrive.service.create_folder(str(key[0]), root, True)
             root = {'id': root, key[0]: folder_id}
         else:
-            folder_id = gdrive.create_folder(str(key[0]), root['id'], True)
+            folder_id = gdrive.service.create_folder(str(key[0]), root['id'], True)
             root.update({key[0]: folder_id})
 
     if len(key) > 1:

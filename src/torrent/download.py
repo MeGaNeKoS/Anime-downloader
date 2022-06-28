@@ -68,11 +68,20 @@ def add_torrent(num_retries=10):
     downloads[anime] = download
 
 
-def remove(anime_id):
+def remove(anime):
     # cancel the download, delete the local files,
     # and add the anime to the log file
-
-    downloads.pop(anime_id, None)
+    if isinstance(anime, str):
+        datas = qbt_client.torrents_info(category=anime)
+        if len(datas) != 1:
+            logger.error(f"More than one torrent with category {anime}, everything will be deleted")
+        for data in datas:  # intentional behavior
+            qbt_client.torrents_delete(delete_files=True, torrent_hashes=data['hash'])
+        qbt_client.torrents_remove_categories(anime)
+        downloads.pop(anime, None)
+    else:
+        qbt_client.torrents_delete(delete_files=True, torrent_hashes=anime['hash'])
+        downloads.pop(anime['category'], None)
 
 
 def upload_file(torrent, download):
@@ -133,7 +142,7 @@ def check_completion():
                 pass
 
     for download in finished:
-        downloads.pop(download, None)
+        remove(download)
 
     while len(downloads) < 3:
         add_torrent()

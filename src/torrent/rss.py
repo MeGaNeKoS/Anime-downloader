@@ -4,7 +4,7 @@ from deps.recognition import recognition
 from src.torrent import download
 from src import database
 from src import helper
-
+from src import config
 
 queue = {}
 downloads = {}
@@ -39,7 +39,8 @@ def rss(feed_link: str, ignore: list, log: list):
                 anime = recognition.track(torrent["title"] + ".mkv")
 
         # skip if in ignore list,
-        if anime["anime_title"].lower() in ignore:
+        # skip if the release not from watched release group
+        if anime["anime_title"].lower() in ignore or anime.get("release_group", "").lower() not in config.RELEASE_GROUP:
             continue
 
         # get the magnet link

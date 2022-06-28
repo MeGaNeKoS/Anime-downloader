@@ -29,8 +29,14 @@ def rss(feed_link: str, ignore: list, log: list):
         if torrent.summary.endswith(" file(s)</a>"):
             anime = recognition.track(torrent["title"], True)
         else:
-            # force add an extensions since the title from torrent usually doesn't include extensions
-            anime = recognition.track(torrent["title"] + ".mkv")
+            for char in torrent["title"][:-6:-1]:
+                # we found the file extensions in the title
+                if char == ".":
+                    anime = recognition.track(torrent["title"])
+                    break
+            else:
+                # force add an extensions since the title from torrent usually doesn't include extensions
+                anime = recognition.track(torrent["title"] + ".mkv")
 
         # skip if in ignore list,
         if anime["anime_title"].lower() in ignore:

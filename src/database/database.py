@@ -8,7 +8,7 @@ class Sqlite:
         c.execute('''CREATE TABLE IF NOT EXISTS preference (
 	anime_name text,
 	anime_id INTEGER,
-	releases_fansub text,
+	release_group text,
 	last_episode INTEGER,
 	folder_path text,
 	CONSTRAINT preferrence_PK PRIMARY KEY (anime_id)

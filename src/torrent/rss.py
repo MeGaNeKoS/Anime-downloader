@@ -36,6 +36,7 @@ def rss(feed_link: str, ignore: list, log: list):
             else:
                 # force add an extensions since the title from torrent usually doesn't include extensions
                 anime = recognition.track(torrent["title"] + ".mkv")
+                anime["file_name"] = torrent["title"]
 
         # skip if in ignore list,
         # skip if the release not from watched release group

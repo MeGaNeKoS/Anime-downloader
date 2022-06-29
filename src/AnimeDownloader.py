@@ -32,8 +32,8 @@ def start_rss():
                 with open(log_file, 'w+', encoding="utf-8") as output:
                     for magnet_link in file_log:
                         output.write("%s\n" % magnet_link)
-            print(f"All rss downloaded. wait {config.CHECK_INTERVAL // 60} minute for recheck")
-        time.sleep(config.CHECK_INTERVAL)
+        print(f"All rss downloaded. wait {(config.CHECK_INTERVAL // 60) * 10} minute for recheck")
+        time.sleep((config.CHECK_INTERVAL // 60) * 10)
 
 
 def start_qbt():

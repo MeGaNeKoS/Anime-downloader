@@ -140,6 +140,10 @@ def check_completion():
         if download in finished:
             continue
         torrent = qbt_client.torrents_info(torrent_hashes=download["hash"])
+        if not torrent:
+            with lock:
+                finished.append(download)
+                continue
         if len(torrent) != 1:
             logger.error("More than one torrent with hash")
         torrent = torrent[0]

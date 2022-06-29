@@ -27,6 +27,9 @@ def connect():
     )
     torrents = qbt_client.torrents_info(tag=config.CLIENT_TAG)
     for torrent in torrents:
+        # bug on qbittorrent web api 4.3.9
+        if torrent["tags"] == "":
+            continue
         anime_id_eps = torrent['category']
         # it's a folder
         if len(torrent.files) != 1:

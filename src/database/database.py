@@ -2,8 +2,8 @@ import sqlite3
 
 
 class Sqlite:
-    def __init__(self, db_file="./data/anime.db"):
-        c = self.conn = sqlite3.connect(db_file)
+    def __init__(self, db_file="./data/anime.db", check_same_thread=False):
+        c = self.conn = sqlite3.connect(db_file, check_same_thread=check_same_thread)
 
         c.execute('''CREATE TABLE IF NOT EXISTS preference (
 	anime_name text,

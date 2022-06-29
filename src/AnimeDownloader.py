@@ -1,7 +1,5 @@
-import sys
 import os
 import time
-import traceback
 import threading
 
 import devlog
@@ -16,7 +14,6 @@ def start_rss():
     while True:
 
         for link in config.RSS_LIST:
-            print(link)
             query = link.partition("q=")[2]
             log_file = f'{config.DATA_DIR}/log/{query}.txt'
             # using os module, check if the file exists
@@ -57,23 +54,16 @@ def main():
     initialize_gdrive()
 
     threads = []
-    threads[0] = threading.Thread(target=start_qbt, daemon=True)
-    threads[0].start()
+    thread = threading.Thread(target=start_qbt, daemon=True)
+    thread.start()
+    threads.append(thread)
     # start the torrent
     time.sleep(5)
-    threads[1] = threading.Thread(target=start_rss, daemon=True)
-    threads[1].start()
+    print("Start 2nd thread")
+    thread = threading.Thread(target=start_rss, daemon=True)
+    thread.start()
+    threads.append(thread)
 
     for thread in threads:
         thread.join()
 
-
-if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Exit using ctrl+c")
-        sys.exit(0)
-    except Exception as e:
-        with open("torrent.log", "a+") as f:
-            f.write(f"{e}\n{traceback.format_exc()}")

@@ -149,8 +149,9 @@ def check_completion():
         torrent = torrent[0]
 
         # check if we finish download the file
-        # need to re work this
-        if torrent['amount_left'] == 0 and torrent['size'] > 0 and 'paused' not in torrent['state']:
+        # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#torrent-management
+        if (torrent['amount_left'] == 0 and torrent['size'] > 0 and
+                torrent['state'] in ['stalledUP', 'pausedUP', 'uploading']):
             if download["status"] == "downloading":
                 download["status"] = "uploading"
                 # create a new thread to upload the file

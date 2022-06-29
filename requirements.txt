@@ -1,0 +1,11 @@
+feedparser~=6.0.8
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+python-devlog
+anitopy~=2.1.0
+requests~=2.26.0
+Anisearch~=1.0.1
+num2words~=0.5.10
+qbittorrent-api~=2022.5.32
+pymediainfo~=5.1.0

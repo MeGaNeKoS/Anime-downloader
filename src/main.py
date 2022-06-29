@@ -2,11 +2,12 @@ import sys
 import os
 import time
 import traceback
+import threading
 
 import devlog
 
 from src import config
-from src.torrent import rss
+from src.torrent import rss, download
 from src.share_var import logs, lock
 
 
@@ -40,17 +41,31 @@ def start_rss():
 
 def start_qbt():
     # start qbt download manager
-    pass
+    download.connect()
+    while True:
+        download.check_completion()
+        time.sleep(config.CHECK_INTERVAL)
 
 
 def initialize_gdrive():
-    # make sure we log in to gdrive first
-    pass
+    from src import gdrive
+    print("gdrive logged in")
 
 
 def main():
     # creating the thread
-    pass
+    initialize_gdrive()
+
+    threads = []
+    threads[0] = threading.Thread(target=start_qbt, daemon=True)
+    threads[0].start()
+    # start the torrent
+    time.sleep(5)
+    threads[1] = threading.Thread(target=start_rss, daemon=True)
+    threads[1].start()
+
+    for thread in threads:
+        thread.join()
 
 
 if __name__ == '__main__':

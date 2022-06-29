@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 
 import qbittorrentapi
 from pymediainfo import MediaInfo
@@ -155,11 +154,11 @@ def check_completion():
                 # not sure for now
                 pass
 
-    for download in finished:
-        remove(download)
+    with lock:
+        for download in finished:
+            remove(download)
 
     with lock:
         while len(downloads) < 3 and queue:
             add_torrent()
 
-    time.sleep(config.CHECK_INTERVAL)

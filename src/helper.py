@@ -32,8 +32,9 @@ def legalize(filename: str):
 
 
 def get_destination(anime: dict, path: list):
-    key = get_create_folder(config.FOLDER_LINK["Anime"][anime["anime_type"]],
-                            list(filter(None, [anime.get("anime_year"), anime.get("anime_title", None)])) + path)
+    key = get_create_folder(config.FOLDER_LINK["Anime"][anime["anime_type"].lower()],
+                            list(filter(None, [anime.get("anime_year"), anime.get("anime_title", None)])) +
+                            [folder for folder in path if folder])
     config.FOLDER_LINK["Anime"][anime["anime_type"]] = key[0]
     save_path = key[1]
     return save_path
@@ -42,7 +43,7 @@ def get_destination(anime: dict, path: list):
 def get_create_folder(root: dict, key: list):
     try:
         folder_id = root[key[0]]
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, IndexError):
         if isinstance(root, str):
             folder_id = gdrive.service.create_folder(str(key[0]), root, True)
             root = {'id': root, key[0]: folder_id}

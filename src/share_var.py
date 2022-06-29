@@ -3,7 +3,7 @@ import threading
 
 queue = {}
 downloads = {}
-lock = threading.Lock()
+lock = threading.RLock()
 logs = {}
 
 for link in config.RSS_LIST:

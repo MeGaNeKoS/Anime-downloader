@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 
 import qbittorrentapi
@@ -104,7 +105,7 @@ def upload_file(torrent, download):
         if file.priority == 0:  # 0 mean do not download
             continue
         status.append(upload.upload(torrent["save_path"], file["name"]))
-        m_info = MediaInfo.parse(torrent["save_path"] + file["name"])
+        m_info = MediaInfo.parse(torrent["save_path"] + os.sep + file["name"])
         for track in m_info.tracks:
             if track.track_type.lower() == 'video':
                 if track.bit_depth == 8:
@@ -132,7 +133,7 @@ def upload_file(torrent, download):
 
 
 def check_completion():
-    for download in downloads:
+    for download in downloads.values():
         if download in finished:
             continue
         torrent = qbt_client.torrents_info(torrent_hashes=download["hash"])

@@ -92,7 +92,7 @@ def remove(anime):
     else:
         qbt_client.torrents_delete(delete_files=True, torrent_hashes=anime['hash'])
         with lock:
-            download = downloads.pop(anime, None)
+            download = downloads.pop(str(anime["anilist"]) + str(anime.get("episode_number", 0)), None)
     # record the anime in the log file
     if download is not None and download.get("log", None) is not None:
         download["log"].insert(0, download["file_name"])
@@ -108,7 +108,7 @@ def upload_file(torrent, download):
         if file.priority == 0:  # 0 mean do not download
             continue
         status.append(upload.upload(torrent["save_path"], file["name"]))
-        m_info = MediaInfo.parse(torrent["save_path"] + os.sep + file["name"])
+        m_info = MediaInfo.parse(os.path.join(torrent["save_path"], file["name"]))
         for track in m_info.tracks:
             if track.track_type.lower() == 'video':
                 if track.bit_depth == 8:

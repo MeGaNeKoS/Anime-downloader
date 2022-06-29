@@ -45,17 +45,17 @@ def upload(save_path, file_path, *, num_retries=10) -> bool:
     local_file_path = os.path.join(local_save_path, folder_path, file_name)
     for retry_num in range(num_retries + 1):
         try:
-            logger.info(f"Uploading {file_name},\n{local_file_path},\n{save_path}")
-            gdrive.service.upload(file_name, local_file_path, save_path)
+            logger.info(f"Uploading {file_name},\n{local_file_path},\n{remote_save_path}")
+            gdrive.service.upload(file_name, local_file_path, remote_save_path)
             break
         except (BrokenPipeError, ConnectionResetError):
             # We got a connection error, so we'll retry
-            logger.error(f"Failed, and restarting {file_name},\n{local_file_path},\n{save_path}")
+            logger.error(f"Failed, and restarting {file_name},\n{local_file_path},\n{remote_save_path}")
             error_count += 1
             sleep_time = random.random() * 2 ** retry_num
             time.sleep(sleep_time)
     else:
         # We tried num_retries number of times, and still haven't succeeded
-        logger.error(f"Failed {file_name},\n{local_file_path},\n{save_path}")
+        logger.error(f"Failed {file_name},\n{local_file_path},\n{remote_save_path}")
         return False
     return True

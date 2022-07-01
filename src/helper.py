@@ -13,7 +13,7 @@ def fansub_priority(first_fansub, second_fansub, equality=True):
 @functools.lru_cache(maxsize=LOWEST_PRIORITY)
 def get_priority(release_group, priority=None):
     try:
-        return config.RELEASE_GROUP.index(release_group)
+        return config.RELEASE_GROUP.index(release_group.lower())
     except ValueError:
         if priority:
             return priority

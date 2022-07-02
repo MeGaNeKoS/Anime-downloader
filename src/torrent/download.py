@@ -93,6 +93,7 @@ def remove(anime):
         qbt_client.torrents_delete(delete_files=True, torrent_hashes=anime['hash'])
         with lock:
             download = downloads.pop(str(anime["anilist"]) + str(anime.get("episode_number", 0)), None)
+        qbt_client.torrents_remove_categories(str(anime["anilist"]) + str(anime.get("episode_number", 0)))
     # record the anime in the log file
     if download is not None and download.get("log", None) is not None:
         download["log"].insert(0, download["file_name"])

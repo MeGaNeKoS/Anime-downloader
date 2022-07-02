@@ -19,16 +19,16 @@ def upload(save_path, file_path, *, num_retries=10) -> bool:
     folder_path, file_name = os.path.split(file_path)  # type: str, str
     torrent_path = folder_path.split(os.sep)  # type: list
 
-    # replace os invalid characters
-    torrent_path = [helper.legalize(name) for name in torrent_path]
-
     anime = recognition.track(file_name)
     if anime.get("anime_type", "torrent") == "torrent":
         # if the anime undetected, then we can't guarantee the anime title is correct or not
         anime.pop("anime_title", None)
+        # replace os invalid characters
+        torrent_path = [helper.legalize(name) for name in torrent_path]
     else:
         # replace os invalid characters
         anime["anime_title"] = helper.legalize(anime["anime_title"])
+        torrent_path = []
     remote_save_path = helper.get_destination(anime, torrent_path)
 
     if anime.get("anime_type", "torrent") != "torrent":

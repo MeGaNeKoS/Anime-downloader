@@ -12,14 +12,17 @@ from deps.recognition import recognition
 logger = logging.getLogger(__name__)
 
 
-def upload(save_path, file_path, *, num_retries=10) -> bool:
+def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     # normalize the path to match this os
     local_save_path = os.path.normpath(save_path)
     file_path = os.path.normpath(file_path)
     folder_path, file_name = os.path.split(file_path)  # type: str, str
     torrent_path = folder_path.split(os.sep)  # type: list
 
-    anime = recognition.track(file_name)
+    if track:
+        anime = recognition.track(file_name)
+    else:
+        anime = recognition.parsing(file_name)
     if anime.get("anime_type", "torrent") == "torrent":
         # if the anime undetected, then we can't guarantee the anime title is correct or not
         anime.pop("anime_title", None)

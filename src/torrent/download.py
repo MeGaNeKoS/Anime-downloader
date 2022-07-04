@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+import time
 
 import qbittorrentapi
 from pymediainfo import MediaInfo
@@ -13,6 +14,8 @@ from src.share_var import queue, downloads, lock
 
 logger = logging.getLogger(__name__)
 finished = []
+upload_threads = []
+upload_remove_time = {}
 qbt_client: qbittorrentapi.Client
 
 
@@ -172,3 +175,76 @@ def check_completion():
         while len(downloads) < 3 and queue:
             add_torrent()
 
+    # check for the manual torrents download
+    for download in qbt_client.torrents_info(category=config.MANUAL_DOWNLOAD_CATEGORY):
+        if download["hash"] in upload_threads or len(upload_threads) >= config.MAX_MANUAL_UPLOAD_THREADS:
+            continue
+        torrent = qbt_client.torrents_info(torrent_hashes=download["hash"])
+        if len(torrent) != 1:
+            logger.error(f"More than one torrent with hash {download['hash']}")
+        torrent = torrent[0]
+
+        # check if we finish download the file
+        # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#torrent-management
+        if (torrent['amount_left'] == 0 and torrent['size'] > 0 and
+                torrent['state'] in ['stalledUP', 'pausedUP', 'uploading']):
+            # create a new thread to upload the file
+            thread = threading.Thread(target=upload_manual, args=(torrent,), daemon=True)
+            thread.start()
+            with lock:
+                upload_threads.append(torrent["hash"])
+
+    finished_manual = []
+    with lock:
+        # check if there is a manual torrent that is finished uploading
+        for torrent_hash, torrent_time in upload_remove_time.items():
+            if torrent_time < time.time():
+                # remove the torrent from the qbt client
+                qbt_client.torrents_delete(delete_files=True, torrent_hashes=torrent_hash)
+                upload_threads.remove(torrent_hash)
+                finished_manual.append(torrent_hash)
+
+    for torrent_hash in finished_manual:
+        upload_remove_time.pop(torrent_hash)
+
+
+def upload_manual(torrent):
+    status = []
+    file8bit = False
+    file_format = ""
+    tags = torrent["tags"].split(",")  # it already guaranties that the tag can't have comma in it
+    track = True if config.MANUAL_DOWNLOAD_TAGS in tags else False
+
+    for file in torrent.files:
+        # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#get-torrent-contents
+        if file.priority == 0:  # 0 mean do not download
+            continue
+        status.append(upload.upload(torrent["save_path"], file["name"], track=track))
+        m_info = MediaInfo.parse(os.path.join(torrent["save_path"], file["name"]))
+        for track in m_info.tracks:
+            if track.track_type.lower() == 'video':
+                if track.bit_depth == 8:
+                    file8bit = True
+                elif track.format != "HEVC":
+                    file_format = track.format
+    if all(status):
+        logger.info(f"{torrent['name']} uploaded")
+        with lock:
+            upload_remove_time[torrent["hash"]] = time.time() + config.UPLOAD_REMOVE_TIME
+        mention_owner = False
+        notif_text = ""
+        if file8bit:
+            mention_owner = True
+            notif_text += "[8bit] "
+        if file_format:
+            mention_owner = True
+            notif_text += f"[{file_format}] "
+        notif_text += f"{torrent['name']} uploaded"
+        helper.discord_user_notif(notif_text, mention_owner)
+
+    else:
+        pass
+    # we finish upload the file
+    with lock:
+        global upload_threads
+        upload_threads.remove(torrent["hash"])

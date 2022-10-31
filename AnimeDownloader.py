@@ -1,6 +1,6 @@
+import logging
 import sys
 import traceback
-import logging
 
 from src import AnimeDownloader
 

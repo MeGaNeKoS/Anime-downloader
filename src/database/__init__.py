@@ -1,4 +1,5 @@
 from os import environ
+
 from .database import Sqlite
 
 db_path = environ.get("DB_PATH")

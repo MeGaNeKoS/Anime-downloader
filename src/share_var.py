@@ -1,19 +1,11 @@
-from src import config
 import threading
+
+from src import config
 
 queue = {}
 downloads = {}
-lock = threading.RLock()
-logs = {}
-
-for link in config.RSS_LIST:
-    query = link.partition("q=")[2]
-    log_file = f'{config.DATA_DIR}/log/{query}.txt'
-    try:
-        with open(log_file, 'r') as f:
-            log = f.read().splitlines()
-    except FileNotFoundError:
-        with open(log_file, 'w+') as f:
-            pass
-        log = []
-    logs[query] = log
+main_lock = threading.RLock()
+gdrive_lock = threading.RLock()
+log_file_lock = threading.RLock()
+queue_lock = main_lock
+download_lock = main_lock

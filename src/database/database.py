@@ -9,6 +9,7 @@ class Sqlite:
 	anime_name text,
 	anime_id INTEGER,
 	release_group text,
+	uncensored BOOLEAN,
 	last_episode INTEGER,
 	folder_path text,
 	CONSTRAINT preferrence_PK PRIMARY KEY (anime_id)

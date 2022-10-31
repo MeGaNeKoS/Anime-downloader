@@ -1,18 +1,22 @@
-import os
 import logging
+import os
 import random
 import time
 
+import devlog
 
-from src import helper
-from src import gdrive
 from deps.recognition import recognition
+from src import gdrive
+from src import helper
+from src.ffmpeg import ffmpeg
 
 # This module using basic logging configuration
 logger = logging.getLogger(__name__)
 
 
+@devlog.log_on_error(trace_stack=True)
 def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
+
     # normalize the path to match this os
     local_save_path = os.path.normpath(save_path)
     file_path = os.path.normpath(file_path)
@@ -20,9 +24,16 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     torrent_path = folder_path.split(os.sep)  # type: list
 
     if track:
-        anime = recognition.track(file_name)
+        try:
+            anime = recognition.track(file_name)
+            if anime.get("anilist", 0) == 0:
+                anime["anime_type"] = "torrent"
+        except Exception:
+            anime = {"anime_type": "torrent"}
     else:
-        anime = recognition.parsing(file_name)
+        anime, _ = recognition.parsing(file_name, False)
+        anime["anime_type"] = "torrent"
+
     if anime.get("anime_type", "torrent") == "torrent":
         # if the anime undetected, then we can't guarantee the anime title is correct or not
         anime.pop("anime_title", None)
@@ -32,24 +43,51 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
         # replace os invalid characters
         anime["anime_title"] = helper.legalize(anime["anime_title"])
         torrent_path = []
+
     remote_save_path = helper.get_destination(anime, torrent_path)
 
+    remove_list = []
+    no_download = False
+    file_list = gdrive.service.get_files(remote_save_path, sub_folder=True)
+    # if the anime already exists, then we don't need to upload it
+    if any(file_name in file['name'] for file in file_list):
+        return True
+    uncensored = "uncensored" in str(anime.get("other", "")).lower()
     if anime.get("anime_type", "torrent") != "torrent":
-        # remove_list = []
-        file_list = gdrive.service.get_files(remote_save_path, sub_folder=True)
-        # if the anime already exists, then we don't need to upload it
-        if any(file_name in file['name'] for file in file_list):
-            return True
-        # for item in remove_list:
-        #     gdrive.service.delete(item['id'])
+        for file in file_list:
+            try:
+                existing, _ = recognition.parsing(file, False)
+            except Exception:
+                continue
+            if (anime.get("anime_title") == existing.get("anime_title") and
+                    anime.get("episode_number") == existing.get("episode_number")):
+                if anime.get("release_version", 1) > existing.get("release_version", 0):
+                    remove_list.append(file)
+                elif uncensored and "uncensored" not in str(existing.get("other", "")).lower():
+                    remove_list.append(file)
+                elif helper.fansub_priority(anime.get("release_group", ""), existing.get("release_group", "")) == 1:
+                    remove_list.append(file)
+                else:
+                    no_download = True
 
+    for item in remove_list:
+        gdrive.service.delete(item['id'])
+    if no_download:
+        return True
     # upload the file
     error_count = 0
-    local_file_path = os.path.join(local_save_path, folder_path, file_name)
+    archive_save_path = os.path.join(local_save_path, folder_path, file_name + ".mkv")
+    local_original_path = os.path.join(local_save_path, folder_path, file_name)
+    local_file_path = ffmpeg.copy(local_original_path, archive_save_path)
+
     for retry_num in range(num_retries + 1):
         try:
             logger.info(f"Uploading {file_name},\n{local_file_path},\n{remote_save_path}")
             gdrive.service.upload(file_name, local_file_path, remote_save_path)
+            try:
+                os.remove(local_file_path)
+            except Exception:
+                pass
             break
         except (BrokenPipeError, ConnectionResetError):
             # We got a connection error, so we'll retry

@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 
 import devlog
 
@@ -27,3 +28,6 @@ def start_rss():
             time.sleep(config.SLEEP["rss_check"])
         except KeyboardInterrupt:
             break
+        except Exception as e:
+            with open("torrent.log", "a+") as f:
+                f.write(f"{e}\n{traceback.format_exc()}")

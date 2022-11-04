@@ -1,5 +1,6 @@
 import threading
 import time
+import traceback
 
 import devlog
 from src import config
@@ -17,7 +18,9 @@ def start_qbt():
             time.sleep(config.SLEEP["download_check"])
         except KeyboardInterrupt:
             break
-
+        except Exception as e:
+            with open("torrent.log", "a+") as f:
+                f.write(f"{e}\n{traceback.format_exc()}")
 
 def initialize_gdrive():
     from src import gdrive

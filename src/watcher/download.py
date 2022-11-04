@@ -7,7 +7,7 @@ import qbittorrentapi
 from pymediainfo import MediaInfo
 
 from deps.recognition import recognition
-from src import config
+from src import config, gdrive
 from src import helper
 from src.share_var import queue, downloads, download_lock, queue_lock
 from src.torrent import upload
@@ -54,34 +54,34 @@ def connect():
 
 
 def add_torrent(num_retries=10):
-
     with queue_lock:
-        anime = next(iter(queue), None)
-        if anime is None:
+        category = next(iter(queue), None)
+        if category is None:
             return
 
-        download = queue.pop(anime)  # guaranteed exists by the previous check
+        download = queue.pop(category)  # guaranteed exists by the previous check
     for i in range(num_retries):
-        if qbt_client.torrents_add(download["link"], tags=config.CLIENT_TAG, category=anime) == "Ok.":
+        if qbt_client.torrents_add(download["link"], tags=config.CLIENT_TAG, category=category) == "Ok.":
             break
         time.sleep(5)
     else:
         logger.error(f"Failed to add torrent\n{download}")
         with queue_lock:
-            queue[anime] = download
+            queue[category] = download
         return
-    datas = qbt_client.torrents_info(category=anime)
+    datas = qbt_client.torrents_info(category=category)
     if len(datas) != 1:
-        logger.error(f"More than one torrent with category {anime}")
+        logger.error(f"More than one torrent with category {category}")
         with queue_lock:
-            queue[anime] = download
+            queue[category] = download
         return
     data = datas[0]
     download["hash"] = data['hash']
     download["status"] = "downloading"
+    download["first_time"] = True
 
     with download_lock:
-        downloads[anime] = download
+        downloads[category] = download
 
 
 def remove_torrent(anime_or_category):
@@ -116,8 +116,6 @@ def remove_torrent(anime_or_category):
             download = downloads.pop(key, None)
             finished.remove(key) if key in finished else None
         qbt_client.torrents_remove_categories(key)
-    print(f"Removing {anime_or_category}")
-    print(download)
     # record the anime in the log file
     if download is not None and download.get("log_file", None) is not None:
         helper.add_to_log(download["log_file"], download["file_name"])
@@ -134,6 +132,9 @@ def check_completion():
             if not torrent:
                 finished.append(download)
                 continue
+            if download["first_time"]:
+                download["first_time"] = False
+                check_files(torrent)
             if len(torrent) != 1:
                 logger.error("More than one torrent with hash")
             torrent = torrent[0]
@@ -157,6 +158,7 @@ def check_completion():
             remove_torrent(download)
 
         while len(downloads) < config.MAX_CONCURRENCY and queue:
+            logger.error(f"Len download: {len(downloads)}, {config.MAX_CONCURRENCY}")
             add_torrent()
 
     # check for the manual torrents download
@@ -189,6 +191,65 @@ def check_completion():
 
         for torrent_hash in finished_manual:
             upload_remove_time.pop(torrent_hash)
+
+
+def check_files(torrent, track=True):
+    for file_torrent in torrent.files:
+        file_path = os.path.normpath(file_torrent['name'])
+        folder_path, file_name = os.path.split(file_path)  # type: str, str
+        torrent_path = folder_path.split(os.sep)  # type: list
+
+        if track:
+            try:
+                anime = recognition.track(file_name)
+                if anime.get("anilist", 0) == 0:
+                    anime["anime_type"] = "torrent"
+            except Exception:
+                anime = {"anime_type": "torrent"}
+        else:
+            anime, _ = recognition.parsing(file_name, False)
+            anime["anime_type"] = "torrent"
+
+        if anime.get("anime_type", "torrent") == "torrent":
+            # if the anime undetected, then we can't guarantee the anime title is correct or not
+            anime.pop("anime_title", None)
+            # replace os invalid characters
+            torrent_path = [helper.legalize(name) for name in torrent_path]
+        else:
+            # replace os invalid characters
+            anime["anime_title"] = helper.legalize(anime["anime_title"])
+            torrent_path = []
+
+        remote_save_path = helper.get_destination(anime, torrent_path)
+
+        remove_list = []
+        no_download = False
+        file_list = gdrive.service.get_files(remote_save_path, sub_folder=True)
+        # if the anime already exists, then we don't need to upload it
+        if any(file_name in file['name'] for file in file_list):
+            return True
+        uncensored = "uncensored" in str(anime.get("other", "")).lower()
+        if anime.get("anime_type", "torrent") != "torrent":
+            for file in file_list:
+                try:
+                    existing, _ = recognition.parsing(file, False)
+                except Exception:
+                    continue
+                if (anime.get("anime_title") == existing.get("anime_title") and
+                        anime.get("episode_number") == existing.get("episode_number")):
+                    if anime.get("release_version", 1) > existing.get("release_version", 0):
+                        remove_list.append(file)
+                    elif uncensored and "uncensored" not in str(existing.get("other", "")).lower():
+                        remove_list.append(file)
+                    elif helper.fansub_priority(anime.get("release_group", ""), existing.get("release_group", "")) == 1:
+                        remove_list.append(file)
+                    else:
+                        no_download = True
+
+        for item in remove_list:
+            gdrive.service.delete(item['id'])
+        if no_download:
+            qbt_client.torrents_file_priority(torrent["hash"], file_torrent.id, 0)
 
 
 def upload_file(torrent, download):

@@ -9,3 +9,6 @@ Anisearch~=1.1.0
 num2words~=0.5.10
 qbittorrent-api~=2022.10.39
 pymediainfo~=5.1.0
+
+httplib2~=0.21.0
+nextcord~=2.2.0

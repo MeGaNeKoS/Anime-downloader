@@ -1,11 +1,13 @@
 import threading
 import time
 
+import devlog
 from src import config
 from src.watcher import download
 from src.watcher.rss import start_rss
 
 
+@devlog.log_on_error(trace_stack=True)
 def start_qbt():
     # start qbt download manager
     download.connect()
@@ -41,6 +43,7 @@ def main():
     try:
         while any(thread_status):
             thread_status = [thread.is_alive() for thread in threads]
+            time.sleep(10)
     except KeyboardInterrupt:
         print("KeyboardInterrupt")
         for thread in threads:

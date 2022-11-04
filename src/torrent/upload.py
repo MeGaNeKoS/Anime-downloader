@@ -77,8 +77,8 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     # upload the file
     error_count = 0
     archive_save_path = os.path.join(local_save_path, folder_path, file_name + ".mkv")
-    local_original_path = os.path.join(local_save_path, folder_path, file_name)
-    local_file_path = ffmpeg.copy(local_original_path, archive_save_path)
+    local_file_path = os.path.join(local_save_path, folder_path, file_name)
+    ffmpeg.copy(local_file_path, archive_save_path)
 
     for retry_num in range(num_retries + 1):
         try:

@@ -25,7 +25,7 @@ def load_local(path):
             pass
 
 
-def copy(local_save_path, archive_save_path):
+def copy(local_save_path, archive_save_path) -> None:
     t = threading.Thread(target=load_local, args=(local_save_path,), daemon=True)
     t.start()
 
@@ -36,15 +36,20 @@ def copy(local_save_path, archive_save_path):
     if not os.path.exists(os.path.dirname(archive_save_path)):
         os.makedirs(os.path.dirname(archive_save_path))
 
-    cmd = f"ffmpeg.exe -v quiet -hide_banner -y -i {old_path} -map 0 -c:v copy -c:a copy -c:s copy -c:d copy -c:t copy {new_path}"
+    cmd = f"ffmpeg -v quiet -hide_banner -y -i {old_path} -map 0 -c:v copy -c:a copy -c:s copy -c:d copy -c:t copy {new_path}"
     # cmd = ["ffmpeg -v quiet -hide_banner -y -i ", f'"{old_path}"', " -map 0 -c:v copy -c:a copy -c:s copy -c:d copy -c:t copy", f'"{file_path}"']
-    proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    stdout, stderr = proc.communicate()
-    if stderr:
-        logger.info(cmd)
-        raise Exception(stderr)
-    t.join()
-    return new_path[1:-1]
+    try:
+        rehashed = subprocess.run(cmd, shell=True, check=True)
+        rehashed.check_returncode()
+        t.join()
+    except Exception:
+        try:
+            os.remove(new_path)
+        except Exception:
+            pass
+        t.join()
+        return local_save_path
+    return archive_save_path
 
 
 def sanitize_path(path, max_length=256):

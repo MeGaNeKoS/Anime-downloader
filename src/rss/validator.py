@@ -6,7 +6,7 @@ from src.watcher.download import remove_torrent
 
 def add_to_queue(links, ignore, file_log):
     for title, link in links.items():
-        if "." in title[:-6:-1]:
+        if "." in title[-6:]:
             # we found the file extensions in the title
             anime = recognition.track(title)
         else:

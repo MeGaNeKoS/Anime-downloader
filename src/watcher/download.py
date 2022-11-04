@@ -78,7 +78,7 @@ def add_torrent(num_retries=10):
     data = datas[0]
     download["hash"] = data['hash']
     download["status"] = "downloading"
-    download["first_time"] = True
+    threading.Thread(target=check_torrent, args=(data,)).start()
 
     with download_lock:
         downloads[category] = download
@@ -132,9 +132,6 @@ def check_completion():
             if not torrent:
                 finished.append(download)
                 continue
-            if download["first_time"]:
-                download["first_time"] = False
-                check_files(torrent)
             if len(torrent) != 1:
                 logger.error("More than one torrent with hash")
             torrent = torrent[0]
@@ -193,7 +190,11 @@ def check_completion():
             upload_remove_time.pop(torrent_hash)
 
 
-def check_files(torrent, track=True):
+def check_torrent(torrent, track=True):
+    while torrent.state == "metaDL" or torrent.state == "checkingResumeData":
+        torrents = qbt_client.torrents_info(torrent_hashes=torrent["hash"])
+        torrent = torrents[0]
+        time.sleep(1)
     for file_torrent in torrent.files:
         file_path = os.path.normpath(file_torrent['name'])
         folder_path, file_name = os.path.split(file_path)  # type: str, str
@@ -227,7 +228,8 @@ def check_files(torrent, track=True):
         file_list = gdrive.service.get_files(remote_save_path, sub_folder=True)
         # if the anime already exists, then we don't need to upload it
         if any(file_name in file['name'] for file in file_list):
-            return True
+            qbt_client.torrents_file_priority(torrent["hash"], file_torrent.id, 0)
+            continue
         uncensored = "uncensored" in str(anime.get("other", "")).lower()
         if anime.get("anime_type", "torrent") != "torrent":
             for file in file_list:

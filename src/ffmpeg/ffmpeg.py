@@ -25,7 +25,7 @@ def load_local(path):
             pass
 
 
-def copy(local_save_path, archive_save_path) -> None:
+def copy(local_save_path, archive_save_path):
     t = threading.Thread(target=load_local, args=(local_save_path,), daemon=True)
     t.start()
 

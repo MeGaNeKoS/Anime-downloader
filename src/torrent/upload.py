@@ -78,14 +78,14 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     error_count = 0
     archive_save_path = os.path.join(local_save_path, folder_path, file_name + ".mkv")
     local_file_path = os.path.join(local_save_path, folder_path, file_name)
-    ffmpeg.copy(local_file_path, archive_save_path)
+    upload_path = ffmpeg.copy(local_file_path, archive_save_path)
 
     for retry_num in range(num_retries + 1):
         try:
             logger.info(f"Uploading {file_name},\n{local_file_path},\n{remote_save_path}")
-            gdrive.service.upload(file_name, local_file_path, remote_save_path)
+            gdrive.service.upload(file_name, upload_path, remote_save_path)
             try:
-                os.remove(local_file_path)
+                os.remove(archive_save_path)
             except Exception:
                 pass
             break

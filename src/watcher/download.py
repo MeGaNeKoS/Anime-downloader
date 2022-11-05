@@ -270,10 +270,8 @@ def upload_file(torrent, download):
         # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#get-torrent-contents
         if file.priority == 0:  # 0 mean do not download
             continue
-        status.append(upload.upload(torrent["save_path"], file["name"]))
         try:
             m_info = MediaInfo.parse(os.path.join(torrent["save_path"], file["name"]))
-
             for track in m_info.tracks:
                 if track.track_type.lower() == 'video':
                     if track.bit_depth == 8:
@@ -282,6 +280,7 @@ def upload_file(torrent, download):
                         file_format = track.format
         except Exception:
             pass
+        status.append(upload.upload(torrent["save_path"], file["name"]))
     if all(status):
         logger.info(f"{torrent['name']} uploaded")
         with download_lock:
@@ -313,13 +312,16 @@ def upload_manual(torrent):
         # https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-4.1)#get-torrent-contents
         if file.priority == 0:  # 0 mean do not download
             continue
-        m_info = MediaInfo.parse(os.path.join(torrent["save_path"], file["name"]))
-        for track in m_info.tracks:
-            if track.track_type.lower() == 'video':
-                if track.bit_depth == 8:
-                    file8bit = True
-                elif track.format != "HEVC":
-                    file_format = track.format
+        try:
+            m_info = MediaInfo.parse(os.path.join(torrent["save_path"], file["name"]))
+            for track in m_info.tracks:
+                if track.track_type.lower() == 'video':
+                    if track.bit_depth == 8:
+                        file8bit = True
+                    elif track.format != "HEVC":
+                        file_format = track.format
+        except Exception:
+            pass
         status.append(upload.upload(torrent["save_path"], file["name"], track=track))
     if all(status):
         logger.info(f"{torrent['name']} uploaded")

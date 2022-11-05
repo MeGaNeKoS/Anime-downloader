@@ -336,9 +336,3 @@ def upload_manual(torrent):
         notif_text += f"{torrent['name']} uploaded"
         helper.discord_user_notif(notif_text, mention_owner)
 
-    else:
-        pass
-    # we finish upload the file
-    with download_lock:
-        global upload_threads
-        upload_threads.remove(torrent["hash"])

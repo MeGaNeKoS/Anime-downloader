@@ -29,14 +29,14 @@ def parser(feed_link: str, log: list) -> dict:
     except (atoma.FeedParseError, atoma.FeedDocumentError, atoma.FeedXMLError, atoma.FeedJSONError) as e:
         logger.info(f'Failed to parse feed {feed_link}: content-type: {res.headers.get("content-type", "")}\n\t{e}')
         return {}
-    new_feeds = rss_parser.items
-    # only proceed the new entries
-    # if entries.get(feed_link, None) is None:
-    #     # if this the first time we parse the feed, the new entries are current entries
-    #     new_feeds = rss_parser.items
-    # else:
-    #     new_feeds = set(entries[feed_link]).difference(rss_parser.items)
 
+    # only proceed the new entries
+    new_feeds = []
+    for entry in rss_parser.items:
+        if entry not in entries.get(feed_link, []):
+            new_feeds.append(entry)
+
+    entries[feed_link] = rss_parser.items
     result = {}
     for torrent in new_feeds:
         # skip the anime if already downloaded,
@@ -67,5 +67,4 @@ def parser(feed_link: str, log: list) -> dict:
             logger.error(f'Failed to get magnet link or torrent link from {torrent}')
         result.update({torrent.title: [magnet_link, torrent_link]})
 
-    entries[feed_link] = new_feeds
     return result

@@ -95,14 +95,21 @@ def duration_humanizer(second: int):
     """
     if second is None:
         return "0 second"
-    if second < 60:
-        return "{} second".format(second)
-    if second < 3600:
-        return "{} minute {} second".format(second // 60, second % 60)
-    if second < 86400:
-        return "{} hour {} minute {} second".format(second // 3600, (second % 3600) // 60, second % 60)
-    return "{} day {} hour {} minute {} second".format(second // 86400, (second % 86400) // 3600, (second % 3600) // 60,
-                                                       second % 60)
+    msg = []
+    if second >= 86400:
+        msg.append(f"{second // 86400} day")
+        second %= 86400
+    if second >= 3600 and second != 0:
+        msg.append(f"{second // 3600} hour(s)")
+        second %= 3600
+    if second >= 60 and second != 0:
+        msg.append(f"{second // 60} minute(s)")
+        second %= 60
+    if second != 0:
+        msg.append(f"{second} second(s)")
+    if not msg:
+        return "ETA: Unknown"
+    return ' '.join(msg)
 
 
 def read_file(filename: str, default=None):

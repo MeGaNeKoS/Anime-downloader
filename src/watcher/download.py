@@ -195,6 +195,7 @@ def check_torrent(torrent, track=True):
         torrents = qbt_client.torrents_info(torrent_hashes=torrent["hash"])
         torrent = torrents[0]
         time.sleep(1)
+    downloaded = []
     for file_torrent in torrent.files:
         file_path = os.path.normpath(file_torrent['name'])
         folder_path, file_name = os.path.split(file_path)  # type: str, str
@@ -227,8 +228,9 @@ def check_torrent(torrent, track=True):
         no_download = False
         file_list = gdrive.service.get_files(remote_save_path, sub_folder=True)
         # if the anime already exists, then we don't need to upload it
-        if any(file_name in file['name'] for file in file_list):
+        if any(file_name == file['name'] for file in file_list):
             qbt_client.torrents_file_priority(torrent["hash"], file_torrent.id, 0)
+            downloaded.append(False)
             continue
         uncensored = "uncensored" in str(anime.get("other", "")).lower()
         if anime.get("anime_type", "torrent") != "torrent":
@@ -252,6 +254,12 @@ def check_torrent(torrent, track=True):
             gdrive.service.delete(item['id'])
         if no_download:
             qbt_client.torrents_file_priority(torrent["hash"], file_torrent.id, 0)
+            downloaded.append(False)
+        else:
+            downloaded.append(True)
+    if not any(downloaded):
+        qbt_client.torrents_delete(delete_files=True, torrent_hashes=torrent["hash"])
+        return False
 
 
 def upload_file(torrent, download):

@@ -6,7 +6,7 @@ import time
 import devlog
 
 from deps.recognition import recognition
-from src import gdrive
+from src import gdrive, share_var
 from src import helper
 from src.ffmpeg import ffmpeg
 
@@ -23,16 +23,17 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     folder_path, file_name = os.path.split(file_path)  # type: str, str
     torrent_path = folder_path.split(os.sep)  # type: list
 
-    if track:
-        try:
-            anime = recognition.track(file_name)
-            if anime.get("anilist", 0) == 0:
-                anime["anime_type"] = "torrent"
-        except Exception:
-            anime = {"anime_type": "torrent"}
-    else:
-        anime, _ = recognition.parsing(file_name, False)
-        anime["anime_type"] = "torrent"
+    with share_var.parser_lock:
+        if track:
+            try:
+                anime = recognition.track(file_name)
+                if anime.get("anilist", 0) == 0:
+                    anime["anime_type"] = "torrent"
+            except Exception:
+                anime = {"anime_type": "torrent"}
+        else:
+            anime, _ = recognition.parsing(file_name, False)
+            anime["anime_type"] = "torrent"
 
     if anime.get("anime_type", "torrent") == "torrent":
         # if the anime undetected, then we can't guarantee the anime title is correct or not
@@ -56,7 +57,8 @@ def upload(save_path, file_path, *, track=True, num_retries=10) -> bool:
     if anime.get("anime_type", "torrent") != "torrent":
         for file in file_list:
             try:
-                existing, _ = recognition.parsing(file, False)
+                with share_var.parser_lock:
+                    existing, _ = recognition.parsing(file, False)
             except Exception:
                 continue
             if (anime.get("anime_title") == existing.get("anime_title") and

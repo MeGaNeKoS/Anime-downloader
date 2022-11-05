@@ -9,7 +9,7 @@ from pymediainfo import MediaInfo
 from deps.recognition import recognition
 from src import config, gdrive
 from src import helper
-from src.share_var import queue, downloads, download_lock, queue_lock
+from src.share_var import queue, downloads, download_lock, queue_lock, parser_lock
 from src.torrent import upload
 
 logger = logging.getLogger(__name__)
@@ -35,17 +35,18 @@ def connect():
             continue
         anime_id_eps = torrent['category']
         # it's a folder
-        if len(torrent.files) != 1:
-            anime = recognition.track(torrent["name"], True)
-        else:
-            name = torrent['name']
-            if "." in name[:-6:-1]:
-                # we found the file extensions in the title
-                anime = recognition.track(name)
+        with parser_lock:
+            if len(torrent.files) != 1:
+                anime = recognition.track(torrent["name"], True)
             else:
-                # force add an extensions since the title from torrent usually doesn't include extensions
-                anime = recognition.track(name + ".mkv")
-                anime["file_name"] = name
+                name = torrent['name']
+                if "." in name[:-6:-1]:
+                    # we found the file extensions in the title
+                    anime = recognition.track(name)
+                else:
+                    # force add an extensions since the title from torrent usually doesn't include extensions
+                    anime = recognition.track(name + ".mkv")
+                    anime["file_name"] = name
 
         anime["hash"] = torrent['hash']
         anime["status"] = "downloading"
@@ -200,17 +201,17 @@ def check_torrent(torrent, track=True):
         file_path = os.path.normpath(file_torrent['name'])
         folder_path, file_name = os.path.split(file_path)  # type: str, str
         torrent_path = folder_path.split(os.sep)  # type: list
-
-        if track:
-            try:
-                anime = recognition.track(file_name)
-                if anime.get("anilist", 0) == 0:
-                    anime["anime_type"] = "torrent"
-            except Exception:
-                anime = {"anime_type": "torrent"}
-        else:
-            anime, _ = recognition.parsing(file_name, False)
-            anime["anime_type"] = "torrent"
+        with parser_lock:
+            if track:
+                try:
+                    anime = recognition.track(file_name)
+                    if anime.get("anilist", 0) == 0:
+                        anime["anime_type"] = "torrent"
+                except Exception:
+                    anime = {"anime_type": "torrent"}
+            else:
+                anime, _ = recognition.parsing(file_name, False)
+                anime["anime_type"] = "torrent"
 
         if anime.get("anime_type", "torrent") == "torrent":
             # if the anime undetected, then we can't guarantee the anime title is correct or not
@@ -337,4 +338,3 @@ def upload_manual(torrent):
             notif_text += f"[{file_format}] "
         notif_text += f"{torrent['name']} uploaded"
         helper.discord_user_notif(notif_text, mention_owner)
-

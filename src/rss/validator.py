@@ -1,18 +1,19 @@
 from deps.recognition import recognition
 from src import config, helper, database
-from src.share_var import queue_lock, queue, downloads, download_lock
+from src.share_var import queue_lock, queue, downloads, download_lock, parser_lock
 from src.watcher.download import remove_torrent
 
 
 def add_to_queue(links, ignore, file_log):
     for title, link in links.items():
-        if "." in title[-6:]:
-            # we found the file extensions in the title
-            anime = recognition.track(title)
-        else:
-            # force add an extensions since the title from torrent usually doesn't include extensions
-            anime = recognition.track(title + ".mkv")
-            anime["file_name"] = title
+        with parser_lock:
+            if "." in title[-6:]:
+                # we found the file extensions in the title
+                anime = recognition.track(title)
+            else:
+                # force add an extensions since the title from torrent usually doesn't include extensions
+                anime = recognition.track(title + ".mkv")
+                anime["file_name"] = title
 
         # skip if in ignore list,
         # skip if the release not from watched release group

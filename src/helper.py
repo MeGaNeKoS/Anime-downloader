@@ -43,6 +43,8 @@ def legalize(filename: str):
 
 
 def get_destination(anime: dict, path: list):
+    if anime["anime_title"].lower() == "detective conan":
+        path.append((int(anime.get("episode_number", 0))//50) + 1)
     folders = list(filter(None, [anime.get("anime_year", None),
                                  anime.get("anime_title", None)])) + [folder for folder in path if folder]
     if isinstance(anime["anime_type"], list):

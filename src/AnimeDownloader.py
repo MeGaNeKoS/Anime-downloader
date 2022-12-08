@@ -12,26 +12,24 @@ from src.watcher.rss import start_rss
 def start_qbt():
     # start qbt download manager
     download.connect()
+    err = 0
     while True:
         try:
             download.check_completion()
             time.sleep(config.SLEEP["download_check"])
+            err = 0
         except KeyboardInterrupt:
             break
         except Exception as e:
-            with open("torrent.log", "a+") as f:
-                f.write(f"{e}\n{traceback.format_exc()}")
-
-def initialize_gdrive():
-    from src import gdrive
-    gdrive.login()
-    print("gdrive logged in")
+            if err > 10:
+                with open("torrent.log", "a+") as f:
+                    f.write(f"{e}\n{traceback.format_exc()}")
+            err += 1
+            time.sleep(20)
 
 
 def main():
     # creating the thread
-    initialize_gdrive()
-
     threads = []
     thread = threading.Thread(target=start_qbt, daemon=True)
     thread.start()

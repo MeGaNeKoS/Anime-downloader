@@ -36,7 +36,7 @@ def copy(local_save_path, archive_save_path):
     if not os.path.exists(os.path.dirname(archive_save_path)):
         os.makedirs(os.path.dirname(archive_save_path))
 
-    cmd = f"ffmpeg -v quiet -hide_banner -y -i {old_path} -map 0 -c:v copy -c:a copy -c:s copy -c:d copy -c:t copy {new_path}"
+    cmd = f"ffmpeg -v quiet -hide_banner -y -i {old_path} -map 0 -c copy {new_path}"
     # cmd = ["ffmpeg -v quiet -hide_banner -y -i ", f'"{old_path}"', " -map 0 -c:v copy -c:a copy -c:s copy -c:d copy -c:t copy", f'"{file_path}"']
     try:
         rehashed = subprocess.run(cmd, shell=True, check=True)
@@ -44,12 +44,12 @@ def copy(local_save_path, archive_save_path):
         t.join()
     except Exception:
         try:
-            os.remove(new_path)
-        except Exception:
+            os.remove(new_path.strip('"'))
+        except FileNotFoundError:
             pass
         t.join()
-        return local_save_path
-    return archive_save_path
+        return False
+    return True
 
 
 def sanitize_path(path, max_length=256):

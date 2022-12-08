@@ -24,6 +24,12 @@ def start_rss():
                 links = rss.parser(link, log_file)
                 rss.add_to_queue(links, ignore, file_log_path)
 
+            # Just to get the fastest anime update
+            file_log_path = f"{config.DATA_DIR['log']}/rss/animetosho"
+            log_file = helper.read_file(file_log_path, [])
+            links = rss.parser("https://feed.animetosho.org/rss2?only_tor=1&q=1080p",
+                               log_file)
+            rss.add_to_queue(links, ignore, file_log_path, force=True)
             logger.info(f"All rss downloaded. Sleeping for {duration_humanizer(config.SLEEP['rss_check'])}")
             time.sleep(config.SLEEP["rss_check"])
         except KeyboardInterrupt:

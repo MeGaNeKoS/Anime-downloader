@@ -1,6 +1,8 @@
 import functools
+import os
 
-from src import config, gdrive
+from deps.recognition import recognition
+from src import config
 from src.share_var import log_file_lock
 
 LOWEST_PRIORITY = len(config.RELEASE_GROUP)
@@ -43,44 +45,28 @@ def legalize(filename: str):
 
 
 def get_destination(anime: dict, path: list):
-    if anime["anime_title"].lower() == "detective conan":
-        path.append((int(anime.get("episode_number", 0))//50) + 1)
+    if anime.get("anime_title", "").lower() in ["meitantei conan"]:
+        path.append(str((int(anime.get("episode_number", 0)) // 50) + 1))
+
     folders = list(filter(None, [anime.get("anime_year", None),
                                  anime.get("anime_title", None)])) + [folder for folder in path if folder]
+
+    if anime.get("isExtras", False):
+        folders.append("Extras")
+
     if isinstance(anime["anime_type"], list):
         anime_type = anime["anime_type"][0]
     else:
         anime_type = anime["anime_type"]
 
     anime_type = anime_type or "torrent"
+
     if not folders:
-        return config.FOLDER_LINK["Anime"][anime_type.lower()]  # put it on torrent root file
+        return config.FOLDER_PATH["Anime"][anime_type.lower()]  # put it on torrent root file
 
-    key = get_create_folder(config.FOLDER_LINK["Anime"][anime_type.lower()],
-                            folders)
-
-    save_path = key[1]
-    return save_path
-
-
-def get_create_folder(root: dict, key: list):
-    try:
-        folder_id = root[key[0]]
-    except (KeyError, TypeError, IndexError):
-        if isinstance(root, str):
-            folder_id = gdrive.service.create_folder(str(key[0]), root, True)
-            root = {'id': root, key[0]: folder_id}
-        else:
-            folder_id = gdrive.service.create_folder(str(key[0]), root['id'], True)
-            root.update({key[0]: folder_id})
-
-    if len(key) > 1:
-        new_info = get_create_folder(root[key[0]], key[1:])
-        root[key[0]] = new_info[0]
-        folder_id = new_info[1]
-    if not type(folder_id) == str:
-        folder_id = folder_id['id']
-    return root, folder_id
+    base_path = config.FOLDER_PATH["Anime"][anime_type.lower()]
+    folders = [str(folder) for folder in folders]
+    return os.path.join(base_path, *folders)
 
 
 def discord_user_notif(msg, mention_owner=False):
@@ -145,21 +131,149 @@ def is_exist(existing, newer, log_file, title) -> bool:
     # if already exist, check for the fansub priority
     priority = fansub_priority(existing["release_group"], newer["release_group"])
     if priority == 1:
-        # the queued fansub has higher priority
-        # so this title will not be downloaded
-        # add to log if not exist
-        add_to_log(log_file, title)
         return True
     elif priority == 0:
         # both fansub has same priority
         # check for the version
-        if existing.get('release_version', 0) >= newer.get('release_version', 0):
+        if is_greater_equal(existing.get('release_version', 0), newer.get('release_version', 0)):
             # the queued version is higher or same to the new one
-            # so this title will not be downloaded
-            # add to log if not exist
-            add_to_log(log_file, title)
             return True
     # replace the queue with the new one
     # I don't want to make a race condition to another process
     # better to remove then re add it again
     return False
+
+
+def is_greater_equal(equation1, equation2):
+    try:
+        if isinstance(equation1, str):
+            equation1 = int(equation1)
+        if isinstance(equation2, str):
+            equation2 = int(equation2)
+    except ValueError:
+        return False
+    return equation1 >= equation2
+
+
+def is_greater_than(equation1, equation2):
+    try:
+        if isinstance(equation1, str):
+            equation1 = int(equation1)
+        if isinstance(equation2, str):
+            equation2 = int(equation2)
+    except ValueError:
+        return False
+    return equation1 > equation2
+
+
+def parse(file_name, track):
+    if track:
+        anime = recognition.track(file_name)
+    else:
+        anime, _ = recognition.parsing(file_name, False)
+    if anime.get("anilist", 0) == 0:
+        anime["anime_type"] = "torrent"
+
+    return anime
+
+
+def should_download(anime, existing_file, uncensored) -> bool:
+    other_uncensored = "uncensored"  in str(existing_file.get("other", "")).lower()
+    if uncensored and not other_uncensored:
+        return True
+
+    if not uncensored and other_uncensored:
+        return False
+
+    if fansub_priority(anime.get("release_group", ""),
+                       existing_file.get("release_group", "")) == 1:
+        return True
+
+    if is_greater_than(anime.get("release_version", 0),
+                       existing_file.get("release_version", 0)):
+        return True
+
+    return False
+
+
+def check_file(file_name, torrent_path, existing_root, track):
+    anime = parse(file_name, track)
+
+    if anime.get("anime_type", "torrent") == "torrent":
+        # if the anime undetected, then we can't guarantee the anime title is correct or not
+        anime.pop("anime_title", None)
+        # replace os invalid characters
+        torrent_path = [legalize(name) for name in torrent_path]
+    else:
+        # replace os invalid characters
+        anime["anime_title"] = legalize(anime["anime_title"])
+        torrent_path = []
+
+    save_path = get_destination(anime, torrent_path)
+
+    remove_list = []
+    no_download = False
+    uncensored = "uncensored" in str(anime.get("other", "")).lower()
+    identifier = (f'{anime.get("anime_title")}_'
+                  f'{anime.get("episode_number")}')
+
+    file_list = existing_root.get(save_path, {})
+    if file_list:
+        existing_file = file_list.get(identifier, {})
+        if existing_file:
+            if existing_file.get("anime_type", "torrent") == "torrent":
+                pass
+            elif should_download(anime, existing_file, uncensored):
+                print(f"Replacing {existing_file['anime_title']} ")
+                remove_list.append(existing_file["file_name"])
+                file_list[identifier] = anime
+            else:
+                no_download = True
+        else:
+            file_list[identifier] = anime
+
+    elif anime.get("anime_type", "torrent") != "torrent":
+        try:
+            dir_files = os.listdir(save_path)
+        except FileNotFoundError:
+            dir_files = []
+
+        for old_file in dir_files:
+            if not os.path.isfile(os.path.join(save_path, old_file)):
+                continue
+            existing_file = parse(old_file, track)
+
+            if existing_file.get("anime_type", "torrent") == "torrent":
+                # if the anime undetected, then we can't guarantee the anime title is correct or not
+                existing_file.pop("anime_title", None)
+            else:
+                # replace os invalid characters
+                existing_file["anime_title"] = legalize(anime["anime_title"])
+
+            existing_identifier = (f'{existing_file.get("anime_title")}_'
+                                   f'{existing_file.get("episode_number")}')
+
+            # duplicate_file = file_list.get(existing_identifier, {})
+            # if not duplicate_file and existing_file.get("episode_number_alt"):
+            #     existing_identifier = (f'{existing_file.get("anime_title")}_'
+            #                            f'{existing_file.get("episode_number_alt")}')
+            #     duplicate_file = file_list.get(existing_identifier, {})
+            #
+            # if duplicate_file:
+            #     if should_download(existing_file, duplicate_file, uncensored):
+            #         remove_list.append(duplicate_file["file_name"])
+            #         file_list[identifier] = existing_file
+            #     else:
+            #         remove_list.append(existing_file["file_name"])
+            #         continue
+
+            if (anime.get("anime_title") == existing_file.get("anime_title")
+                    and anime.get("episode_number") == existing_file.get("episode_number")):
+                if should_download(anime, existing_file, uncensored):
+                    print(f"replace {existing_file['file_name']} with {file_name}")
+                    remove_list.append(old_file)
+                    file_list[existing_identifier] = anime
+                else:
+                    file_list[existing_identifier] = existing_file
+                    no_download = True
+    return no_download, remove_list, save_path

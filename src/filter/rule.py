@@ -11,6 +11,14 @@ class RuleCollection:
         self.match_all = match_all
         self.active = active
 
+    # define a __dict__ magic method that returns the data to be serialized to JSON
+    def __dict__(self):
+        return {
+            'rules': self.rules,
+            'match_all': self.match_all,
+            'active': self.active,
+        }
+
     def add(self, element, operator, value, negate=False, active=True):
         self.rules.append((element, operator, value, negate, active))
 
@@ -48,6 +56,14 @@ class RuleCollection:
 class RuleManager:
     def __init__(self):
         self.collections = {}
+
+    def __dict__(self):
+        return {
+            'Rules': {
+                name: collection.__dict__()
+                for name, collection in self.collections.items()
+            }
+        }
 
     def add_collection(self, name, collection):
         self.collections[name] = collection

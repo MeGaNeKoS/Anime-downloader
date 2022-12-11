@@ -163,3 +163,62 @@ class RuleManagerTest(unittest.TestCase):
 
         # The check method should return True because both collections are inactive
         self.assertTrue(self.manager.check("foobarbaz"))
+
+    def test_serialize(self):
+        # Test the serialize method
+        collection1 = RuleCollection()
+        collection1.add("file_name", "contains", "foobar")
+        collection1.add("file_name", "contains", "baz")
+
+        collection2 = RuleCollection()
+        collection2.match_all = False
+        collection2.add("file_name", "contains", "foobar")
+        collection2.add("file_name", "contains", "baz")
+
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
+        self.assertEqual({
+            "Rules": {
+                "my_test 1": {
+                    "match_all": True,
+                    "active": True,
+                    "rules": [
+                        (
+                            "file_name",
+                            "contains",
+                            "foobar",
+                            False,
+                            True
+                        ),
+                        (
+                            "file_name",
+                            "contains",
+                            "baz",
+                            False,
+                            True
+                        )
+                    ]
+                },
+                "my_test 2": {
+                    "match_all": False,
+                    "active": True,
+                    "rules": [
+                        (
+                            "file_name",
+                            "contains",
+                            "foobar",
+                            False,
+                            True
+                        ),
+                        (
+                            "file_name",
+                            "contains",
+                            "baz",
+                            False,
+                            True
+                        )
+                    ]
+                }
+            }
+        },
+            self.manager.__dict__())

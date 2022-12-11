@@ -59,11 +59,27 @@ class RuleManager:
 
     def __dict__(self):
         return {
-            'Rules': {
                 name: collection.__dict__()
                 for name, collection in self.collections.items()
-            }
         }
+
+    @classmethod
+    def from_json(cls, manager_dict):
+        # Create a new RuleManager instance
+        new_manager = RuleManager()
+
+        # Iterate over the RuleCollection dictionaries in the manager dictionary
+        for collection_name, collection_dict in manager_dict.items():
+            # Create a new RuleCollection instance from the dictionary
+            collection = RuleCollection()
+            collection.rules = collection_dict['rules']
+            collection.match_all = collection_dict['match_all']
+            collection.active = collection_dict['active']
+
+            # Add the RuleCollection instance to the RuleManager instance
+            new_manager.add_collection(collection_name, collection)
+
+        return new_manager
 
     def add_collection(self, name, collection):
         self.collections[name] = collection

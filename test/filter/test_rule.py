@@ -178,47 +178,65 @@ class RuleManagerTest(unittest.TestCase):
         self.manager.add_collection("my_test 1", collection1)
         self.manager.add_collection("my_test 2", collection2)
         self.assertEqual({
-            "Rules": {
-                "my_test 1": {
-                    "match_all": True,
-                    "active": True,
-                    "rules": [
-                        (
-                            "file_name",
-                            "contains",
-                            "foobar",
-                            False,
-                            True
-                        ),
-                        (
-                            "file_name",
-                            "contains",
-                            "baz",
-                            False,
-                            True
-                        )
-                    ]
-                },
-                "my_test 2": {
-                    "match_all": False,
-                    "active": True,
-                    "rules": [
-                        (
-                            "file_name",
-                            "contains",
-                            "foobar",
-                            False,
-                            True
-                        ),
-                        (
-                            "file_name",
-                            "contains",
-                            "baz",
-                            False,
-                            True
-                        )
-                    ]
-                }
+            "my_test 1": {
+                "match_all": True,
+                "active": True,
+                "rules": [
+                    (
+                        "file_name",
+                        "contains",
+                        "foobar",
+                        False,
+                        True
+                    ),
+                    (
+                        "file_name",
+                        "contains",
+                        "baz",
+                        False,
+                        True
+                    )
+                ]
+            },
+            "my_test 2": {
+                "match_all": False,
+                "active": True,
+                "rules": [
+                    (
+                        "file_name",
+                        "contains",
+                        "foobar",
+                        False,
+                        True
+                    ),
+                    (
+                        "file_name",
+                        "contains",
+                        "baz",
+                        False,
+                        True
+                    )
+                ]
             }
         },
             self.manager.__dict__())
+
+    def test_from_json(self):
+        # Test the from_json method
+        collection1 = RuleCollection()
+        collection1.add("file_name", "contains", "foobar")
+        collection1.add("file_name", "contains", "baz")
+
+        collection2 = RuleCollection()
+        collection2.match_all = False
+        collection2.add("file_name", "contains", "foobar")
+        collection2.add("file_name", "contains", "baz")
+
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
+
+        manager = RuleManager.from_json(self.manager.__dict__())
+
+        for name, collection in manager.collections.items():
+            self.assertIn(name, self.manager.collections)
+            self.assertEqual(collection.__dict__(), self.manager.collections[name].__dict__())

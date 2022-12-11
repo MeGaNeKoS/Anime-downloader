@@ -102,35 +102,40 @@ class RuleManagerTest(unittest.TestCase):
         collection1 = RuleCollection()
         collection2 = RuleCollection()
 
-        self.manager.add_collection(collection1)
-        self.manager.add_collection(collection2)
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
 
-        self.assertEqual(self.manager.collections, [collection1, collection2])
+        self.assertEqual({
+            'my_test 1': collection1,
+            'my_test 2': collection2
+        },
+            self.manager.collections)
 
     def test_remove_collection(self):
         # Test the remove_collection method
         collection1 = RuleCollection()
         collection2 = RuleCollection()
 
-        self.manager.add_collection(collection1)
-        self.manager.add_collection(collection2)
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
 
-        self.manager.remove_collection(collection1)
+        self.manager.remove_collection("my_test 1")
 
-        self.assertEqual(self.manager.collections, [collection2])
+        self.assertEqual({"my_test 2": collection2}, self.manager.collections)
 
     def test_remove_collection_fail(self):
         # Test the remove_collection method
         collection1 = RuleCollection()
         collection2 = RuleCollection()
 
-        self.manager.add_collection(collection1)
-        self.manager.add_collection(collection2)
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
 
-        self.manager.remove_collection(collection1)
-        self.manager.remove_collection(collection1)
+        self.manager.remove_collection("my_test 1")
+        self.manager.remove_collection("my_test 1")
 
-        self.assertEqual(self.manager.collections, [collection2])
+        self.assertEqual({"my_test 2": collection2}, self.manager.collections)
+
     def test_check(self):
         # Test the check method
         collection1 = RuleCollection()
@@ -142,8 +147,8 @@ class RuleManagerTest(unittest.TestCase):
         collection2.add("file_name", "contains", "foobar")
         collection2.add("file_name", "contains", "baz")
 
-        self.manager.add_collection(collection1)
-        self.manager.add_collection(collection2)
+        self.manager.add_collection("my_test 1", collection1)
+        self.manager.add_collection("my_test 2", collection2)
 
         # The check method should return True because both collections match
         self.assertTrue(self.manager.check({"file_name": "foobarbaz"}))

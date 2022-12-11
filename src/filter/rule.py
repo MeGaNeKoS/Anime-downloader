@@ -47,19 +47,19 @@ class RuleCollection:
 
 class RuleManager:
     def __init__(self):
-        self.collections = []
+        self.collections = {}
 
-    def add_collection(self, collection):
-        self.collections.append(collection)
+    def add_collection(self, name, collection):
+        self.collections[name] = collection
 
-    def remove_collection(self, collection):
+    def remove_collection(self, name):
         try:
-            self.collections.remove(collection)
-        except ValueError:
-            logger.info(f"Failed to remove collection {collection}")
+            self.collections.pop(name)
+        except KeyError:
+            logger.info(f"Failed to remove collection {name}")
 
     def check(self, source):
-        for collection in self.collections:
+        for collection in self.collections.values():
             if not collection.active:
                 continue
 

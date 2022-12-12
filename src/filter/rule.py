@@ -1,4 +1,5 @@
 import logging
+from typing import Dict, List
 
 from src.filter.operator import Operator
 
@@ -7,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class RuleCollection:
     def __init__(self, match_all=True, active=True):
-        self.rules = []
+        self.rules: List[tuple] = []
         self.match_all = match_all
         self.active = active
 
@@ -55,7 +56,7 @@ class RuleCollection:
 
 class RuleManager:
     def __init__(self):
-        self.collections = {}
+        self.collections: Dict[str, RuleCollection] = {}
 
     def __dict__(self):
         return {

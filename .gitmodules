@@ -1,0 +1,3 @@
+[submodule "deps/recognition"]
+	path = deps/recognition
+	url = https://github.com/MeGaNeKoS/Anime-recognition.git

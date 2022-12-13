@@ -36,8 +36,16 @@ class RuleCollection:
                 continue
             result = False
 
-            something = source.get(element, "")
-            is_satisfied = Operator.get_function(operator)(something, value)
+            data = source.get(element, "")
+            if isinstance(data, list):
+                logger.debug(f"Element {element} is a list. This is not supported yet. Check skipped.\n{source}")
+                continue
+
+            try:
+                is_satisfied = Operator.get_function(operator)(data, value)
+            except Exception as e:
+                logger.error(f"Error while checking rule {element} {operator} {value}:\n{e}")
+                continue
 
             if negate:
                 is_satisfied = not is_satisfied

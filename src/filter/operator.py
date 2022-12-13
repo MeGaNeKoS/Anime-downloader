@@ -4,19 +4,21 @@ class Operator:
     """
 
     # Define a dictionary that maps operators to functions
+    # The rule value is represented by the variable 'value'
+    # The rule element is represented by the variable 'data'
     functions = {
         # String, Tuple operator
-        "contains": lambda x, y: y in x,
-        "in": lambda x, y: x in y,
+        "contains": lambda data, value: value in data,  # data contains value
+        "in": lambda data, value: data in value,  # data in value
         # String operator
-        "begin_with": lambda x, y: x.startswith(y),
-        "end_with": lambda x, y: x.endswith(y),
-        "equal": lambda x, y: x == y,
+        "begin_with": lambda data, value: data.startswith(value),  # data begins with value
+        "end_with": lambda data, value: data.endswith(value),  # data ends with value
+        "equal": lambda data, value: data == value,  # data is equal to value
         # Number operator
-        "greater_than": lambda x, y: x > y,
-        "greater_than_or_equal": lambda x, y: x >= y,
-        "less_than": lambda x, y: x < y,
-        "less_than_or_equal": lambda x, y: x <= y,
+        "greater_than": lambda data, value: data > value,  # data is greater than value
+        "greater_than_or_equal": lambda data, value: data >= value,  # data is greater than or equal to value
+        "less_than": lambda data, value: data < value,  # data is less than value
+        "less_than_or_equal": lambda data, value: data <= value,  # data is less than or equal to value
     }
 
     @classmethod

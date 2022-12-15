@@ -1,7 +1,7 @@
 from src import helper
 from src.filter.rule import RuleManager
 
-from src.share_var import waiting_queue
+from src.share_var import waiting_queue, queue_lock
 
 
 def add_to_queue(manager: RuleManager, links: dict, file_log: str) -> None:
@@ -11,5 +11,6 @@ def add_to_queue(manager: RuleManager, links: dict, file_log: str) -> None:
 
         anime = helper.parse(title, True)
 
-        if manager.check(anime):
-            waiting_queue.put(anime)
+        with queue_lock:
+            if manager.check(anime):
+                waiting_queue.append(anime)

@@ -15,9 +15,7 @@ def main():
     logger.info(f"Starting Anime Downloader...")
 
     threads = []
-    rss_thread = RSS(stop_event,
-                     config.RSS_LIST,
-                     f"{config.DATA_DIR['log']}/rss/")
+    rss_thread = RSS(stop_event)
     rss_thread.start()
     threads.append(rss_thread)
 

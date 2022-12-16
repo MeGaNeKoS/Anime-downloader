@@ -15,12 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class RSS(Thread):
-    def __init__(self, stop_event: Event,
-                 links: dict,
-                 log_path: str):
+    def __init__(self, stop_event: Event):
         super().__init__()
-        self.links = links
-        self.log_path = log_path
         self.stop_event = stop_event
 
     @devlog.log_on_error(trace_stack=True)
@@ -29,8 +25,8 @@ class RSS(Thread):
         while not self.stop_event.is_set():
             logger.info(f"Checking RSS feeds...")
             try:
-                for file_log, link in self.links.items():
-                    file_log_path = os.path.join(self.log_path, file_log)
+                for file_log, link in config.RSS_LIST.items():
+                    file_log_path = os.path.join(f"{config.DATA_DIR['log']}/rss/", file_log)
                     log_file = helper.file.read_file(file_log_path)
 
                     links = parser(link, log_file)
@@ -41,5 +37,5 @@ class RSS(Thread):
                 logger.info(f"All rss downloaded. Sleeping for {helper.duration_humanizer(config.SLEEP['rss_check'])}")
                 self.stop_event.wait(config.SLEEP["rss_check"])
             except Exception as e:
-                with open("torrent.log", "a+") as f:
+                with open(config.LOG_FILE['rss'], "a+") as f:
                     f.write(f"{e}\n{traceback.format_exc()}")

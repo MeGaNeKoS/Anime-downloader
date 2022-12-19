@@ -17,8 +17,11 @@ def add_to_log(filename: str, msg: str):
 
 
 def read_file(file_path: str) -> list:
-
-    modified_time = os.stat(file_path).st_mtime
+    try:
+        modified_time = os.stat(file_path).st_mtime
+    except FileNotFoundError:
+        modified_time = 0
+        _cache[file_path] = {'mTime': modified_time, 'log': []}
 
     if modified_time != _cache[file_path]['mTime']:
         try:
@@ -34,6 +37,7 @@ def read_file(file_path: str) -> list:
 
 
 def write_file(file_path: str, data: str):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w+') as output_file:
         output_file.write(data)
 

@@ -17,26 +17,21 @@ class ThreadDict(dict):
 
     def _verify_lock(self):
         # not exists in pyi files but exists in py files
-        print(dir(self.thread_lock))
         if not self.thread_lock._is_owned():
             print("Failed to acquire lock")
             raise RuntimeError("ThreadDict must be accessed with the lock acquired")
 
-    def __setitem__(self, key, value):
+    def __contains__(self, key):
         self._verify_lock()
-        super().__setitem__(key, value)
-
-    def __getitem__(self, key):
-        self._verify_lock()
-        return super().__getitem__(key)
+        return super().__contains__(key)
 
     def __delitem__(self, key):
         self._verify_lock()
         super().__delitem__(key)
 
-    def __contains__(self, key):
+    def __getitem__(self, key):
         self._verify_lock()
-        return super().__contains__(key)
+        return super().__getitem__(key)
 
     def __iter__(self):
         self._verify_lock()
@@ -49,6 +44,10 @@ class ThreadDict(dict):
     def __repr__(self):
         self._verify_lock()
         return super().__repr__()
+
+    def __setitem__(self, key, value):
+        self._verify_lock()
+        super().__setitem__(key, value)
 
     def __str__(self):
         self._verify_lock()
@@ -112,7 +111,8 @@ class ThreadList(list):
         return super().__ge__(other)
 
     def __getattribute__(self, item):
-        self._verify_lock()
+        if str(item) not in ['_verify_lock', 'thread_lock']:
+            self._verify_lock()
         return super().__getattribute__(item)
 
     def __getitem__(self, key):

@@ -40,6 +40,8 @@ class RuleCollection:
             if isinstance(data, list):
                 logger.debug(f"Element {element} is a list. This is not supported yet. Check skipped.\n{source}")
                 continue
+            elif isinstance(data, str):
+                data = data.lower()
 
             try:
                 is_satisfied = Operator.get_function(operator)(data, value)

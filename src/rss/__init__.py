@@ -39,3 +39,4 @@ class RSS(Thread):
             except Exception as e:
                 with open(config.LOG_FILE['rss'], "a+") as f:
                     f.write(f"{e}\n{traceback.format_exc()}")
+                self.stop_event.wait(10)  # timout before retrying

@@ -21,6 +21,7 @@ LOG_FILE = {
     "download": "download.log",
 }
 
+MAX_CONCURRENT_DOWNLOADS = 6
 MAX_LOG = 100
 
 RELEASE_GROUP = ('rom & rem',  # consistent but not much anime they have, and also they provide uncensored version
@@ -61,7 +62,12 @@ RULES = {
 
 SLEEP = {
     "rss_check": 10 * 60,  # 10 minutes, required
-    "download_check": 10,  # 1 minute, required
-    "global": 3,  # 10 seconds, required
+    "download_check": 10,  # 10 seconds, required
+    "global": 3,  # 3 seconds, required
 }
 
+
+CLIENT_CONFIG_ARGS = ("localhost", 8080, "admin", "adminadmin")
+CLIENT_CONFIG_KWARGS = {}
+
+UPLOAD_REMOVAl_TIME_SECONDS = 0  # 0 means immediate remove

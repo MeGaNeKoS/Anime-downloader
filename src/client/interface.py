@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from threading import Lock, RLock
 from typing import List, Union
 
 
@@ -6,13 +7,19 @@ class TorrentFile(dict):
     def __init__(self, identifier, name, size, downloaded: bool, folder_path):
         """
         I'm not sure is this data enough, but we can update later.
+
+        :param identifier: unique identifier of the file in the torrent file_list
+        :param name: name of the file
+        :param size: total size of the file
+        :param downloaded: is the file will be downloaded
+        :param folder_path: path to the folder where the file will be downloaded
         """
         super().__init__()
         self['identifier'] = identifier
         self["name"] = name
         self['size'] = size
-        self['folder_path'] = folder_path
         self['downloaded'] = downloaded
+        self['folder_path'] = folder_path
 
 
 class TorrentInfo(dict):
@@ -21,6 +28,15 @@ class TorrentInfo(dict):
                  save_path=None):
         """
         I'm not sure is this data enough, but we can update later.
+
+        :param torrent_hash: unique identifier of the torrent
+        :param name: name of the torrent
+        :param progress: progress of the torrent
+        :param status: status of the torrent
+        :param category: category of the torrent
+        :param tags: tags of the torrent
+        :param files: list of files in the torrent
+        :param save_path: path to the folder where the torrent will be downloaded
         """
         super().__init__()
         self["hash"] = torrent_hash
@@ -36,36 +52,58 @@ class TorrentInfo(dict):
 
 
 class Torrent:
-    def __init__(self, anime, url: list):
+    def __init__(self, anime, url: list, file_log: str, remove_file: bool = False):
+        """
+        :param anime: Anime dict
+        :param url: list of url
+        :param file_log: path to file log
+        :param remove_file: remove torrent file if this torrent is removed
+        """
         self.anime = anime
         self.url = url
+        self.log_file = file_log
 
         self.client: Union[Client, None] = None
         self.hash: str = ""
         self.fail = 0
-        self.remove_file = False
+        self.remove_file = remove_file
 
     def set_client(self, client: 'Client') -> None:
+        """
+        Set client for this torrent
+        """
         self.client = client
 
     def get_info(self) -> TorrentInfo:
-        print(f"Getting info {self.hash}")
+        """
+        Get the information of the torrent.
+        """
         return self.client.get_torrent_info(self.hash)
 
     def add_torrent(self) -> bool:
+        """
+        Add torrent to client
+        """
         self.hash = self.client.add_torrent(self)
         if self.hash:
+            # Call when torrent is added successfully
             self.client.torrent_on_start(self)
             return True
         return False
 
     def remove_torrent(self) -> bool:
+        """
+        Remove torrent from client
+        """
         if self.client.remove_torrent(self.hash, self.remove_file):
             return True
         return False
 
-    def torrent_on_finish(self) -> None:
-        self.client.torrent_on_finish(self)
+    def torrent_on_finish(self, lock: Union[Lock, RLock], removal_time: float, download_queue: list, remove_queue: dict) -> None:
+        """
+        Call when torrent is finished
+        """
+        self.client.torrent_on_finish(self, lock, removal_time, download_queue, remove_queue)
 
 
 class Client(ABC):
@@ -92,10 +130,10 @@ class Client(ABC):
 
     # Torrent methods
     @abstractmethod
-    def add_torrent(self, torrent: Torrent) -> bool:
+    def add_torrent(self, torrent: Torrent) -> str:
         """
         This class is used to add a torrent to the client. Torrent url can be a magnet link or a link to a torrent file.
-        This function returns True if the torrent was added successfully, otherwise it returns False.
+        This function returns Info-hash if the torrent was added successfully, otherwise it returns False.
         """
         raise NotImplemented
 
@@ -104,14 +142,6 @@ class Client(ABC):
         """
         Get the information of a torrent.
         This function returns a dictionary with the information of the torrent.
-
-        """
-        raise NotImplemented
-
-    @abstractmethod
-    def get_torrents(self) -> List[TorrentInfo]:
-        """
-        Get all torrents from the client. This function returns a list of dictionaries.
         """
         raise NotImplemented
 
@@ -133,7 +163,7 @@ class Client(ABC):
         raise NotImplemented
 
     @abstractmethod
-    def torrent_on_finish(self, torrent: Torrent) -> None:
+    def torrent_on_finish(self, torrent: Torrent, lock: Lock, removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         This function is called when the torrent is finished.
         """

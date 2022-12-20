@@ -7,6 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 class RuleCollection:
+    """
+    This class is used to store a collection of rules.
+    """
     def __init__(self, match_all=True, active=True):
         self.rules: List[tuple] = []
         self.match_all = match_all
@@ -27,6 +30,9 @@ class RuleCollection:
         self.rules.remove((element, operator, value, negate, active))
 
     def check(self, source) -> bool:
+        """
+        Check if the source matches the rules
+        """
         if not self.active:
             return True
 
@@ -65,17 +71,20 @@ class RuleCollection:
 
 
 class RuleManager:
+    """
+    This method is used to create a RuleCollection.
+    """
     def __init__(self):
         self.collections: Dict[str, RuleCollection] = {}
 
-    def __dict__(self):
+    def __dict__(self) -> dict:
         return {
                 name: collection.__dict__()
                 for name, collection in self.collections.items()
         }
 
     @classmethod
-    def from_json(cls, manager_dict):
+    def from_json(cls, manager_dict) -> 'RuleManager':
         # Create a new RuleManager instance
         new_manager = RuleManager()
 
@@ -92,16 +101,19 @@ class RuleManager:
 
         return new_manager
 
-    def add_collection(self, name, collection):
+    def add_collection(self, name, collection) -> None:
         self.collections[name] = collection
 
-    def remove_collection(self, name):
+    def remove_collection(self, name) -> None:
         try:
             self.collections.pop(name)
         except KeyError:
             logger.info(f"Failed to remove collection {name}")
 
-    def check(self, source):
+    def check(self, source) -> bool:
+        """
+        Check if the source matches all rule collections
+        """
         for collection in self.collections.values():
             if not collection.active:
                 continue

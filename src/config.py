@@ -5,6 +5,7 @@ DATA_DIR = {
     "log": "./data/log",  # required
 }
 
+# Define the changes for invalid characters in the filename
 LEGALIZE_CHARACTER = {':': '：',  # colon to full-width colon
                       '/': '／',  # slash to full-width slash
                       '<': '＜',  # less-than to full-width less-than
@@ -45,15 +46,15 @@ RSS_LIST = {
 }
 
 RULES = {
-    "My Rule": {
+    "My Collection 1": {
         "rules": [
-            [
+            (
                 "release_group",
                 "in",
                 RELEASE_GROUP,
                 False,
                 True
-            ]
+            )
         ],
         "match_all": True,
         "active": True

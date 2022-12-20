@@ -10,6 +10,9 @@ entries = {}
 
 
 def parser(feed_link: str, log: list) -> dict:
+    """
+    For simplicity, it will change to use feedparser in the future
+    """
     try:
         res = requests.get(feed_link)
     except RequestException as e:

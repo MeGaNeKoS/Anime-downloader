@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 # This is to prevent the client from being overloaded and ignoring the request,
 # especially when the client on heavy load.
 
-# This part only add COOLDOWN_TIMER whenever the Client class tries to make an API call. Since this is a global timer,
+# This part only add cooldown whenever the Client class tries to make an API call. Since this is a global timer,
 # ideally we only sleep when we want to execute the request. Meanwhile, the code should continue the call preparation.
 # However, since I don't know where the request will be executed, I have to sleep somewhere before it executed.
-# This is not ideal, but it is the best we can do.
+# This is not ideal, but it is the best I can do.
 
 # P.S: since the preparation is very fast, the performance impact is negligible.
 
@@ -57,6 +57,9 @@ Request._request_manager = functools.singledispatch(_delayed_request_manager)
 class QBittorrent(Client):
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the client. Any parameter is passed to the real client.
+        """
         self._default_category = None
         self._default_tag = None
         self._lock = threading.RLock()  # Required on multithreading applications
@@ -70,6 +73,9 @@ class QBittorrent(Client):
     # Utility methods
     @classmethod
     def _populate_torrent_files(cls, files: TorrentFilesList):
+        """
+        Convert the torrent files to List[TorrentFile] object.
+        """
         normalize = []
         for file in files:
             folder_path, filename = os.path.split(file.name)
@@ -84,6 +90,9 @@ class QBittorrent(Client):
 
     @classmethod
     def _populate_torrent_info(cls, entries: TorrentInfoList, max_data=-1) -> List[TorrentInfo]:
+        """
+        Convert the torrent information to List[TorrentInfo] object.
+        """
         normalize = []
         for entry in entries.data[:max_data]:
             if entry.state_enum.is_checking:
@@ -129,10 +138,6 @@ class QBittorrent(Client):
 
     # Torrent methods
     def add_torrent(self, torrent: Torrent) -> str:
-        """
-        Add a torrent to the client.
-        Returns InfoHash if the torrent was added successfully.
-        """
         torrent_url = torrent.url
         tags = self._default_tag
         category = self._default_category
@@ -183,7 +188,7 @@ class QBittorrent(Client):
                             self.torrent_remove_tag(data["hash"], [identifier], True)
                             return data["hash"]
 
-                # let it in with statement to give a gap between failed attempts
+                # wait before retry
                 time.sleep(self._wait_time_second)
         return ""
 
@@ -202,10 +207,6 @@ class QBittorrent(Client):
                     return TorrentInfo()
         return TorrentInfo()
 
-    def get_torrents(self) -> List[TorrentInfo]:
-        entries = self.client.torrents_info(category=self._default_category)
-        return self._populate_torrent_info(entries)
-
     def remove_torrent(self, torrent_hash: str, delete_files: bool) -> bool:
         for i in range(self._number_retries):
             with self._lock:
@@ -220,40 +221,32 @@ class QBittorrent(Client):
         return False
 
     # Event behavior methods
-    def torrent_on_finish(self, torrent: Torrent) -> None:
+    def torrent_on_finish(self, torrent: Torrent, lock: threading.Lock,
+                          removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         Do whatever you want when the torrent is finished.
         """
-        print("Starting post processing")
-        print(f"Torrent data: {torrent.anime}")
+        logger.info("Starting post processing")
+        logger.info(f"Torrent data: {torrent.anime}")
+        dtime = time.time() + removal_time
+        with lock:
+            # remove the torrent from the download queue immediately
+            download_queue.remove(torrent)
+            remove_queue[dtime] = torrent
         return
 
     def torrent_on_start(self, torrent: Torrent) -> None:
         """
         Do whatever you want when the torrent is started.
         """
-        print("Starting pre processing")
-        print(f"Torrent data: {torrent.anime}")
+        logger.info("Starting pre processing")
+        logger.info(f"Torrent data: {torrent.anime}")
         return
 
     # client specific methods
-    def torrent_add_tags(self, torrent_hash: str, tags: list) -> bool:
-        for _ in range(self._number_retries):
-            with self._lock:
-                self.client.torrents_add_tags(torrent_hashes=torrent_hash, tags=tags)
-
-                data = self.get_torrent_info(torrent_hash)
-                for tag in tags:
-                    if tag in data['tags']:
-                        continue
-                    break
-                else:
-                    return True
-        return False
-
     def torrent_remove_tag(self, torrent_hash: str, tags: list, delete=False) -> bool:
         """
-        Delete mean remove the tag itself. Otherwise, it will just remove the tag from the torrent.
+        Delete mean delete the tag itself. Otherwise, it will just remove the tag from the torrent.
         """
         for _ in range(self._number_retries):
             with self._lock:

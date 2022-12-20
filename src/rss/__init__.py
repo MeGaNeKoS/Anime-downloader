@@ -31,9 +31,9 @@ class RSS(Thread):
         while not self.stop_event.is_set():
             logger.info(f"Checking RSS feeds...")
             try:
-                for file_log, link in config.RSS_LIST.items():
-                    file_log_path = os.path.join(f"{config.DATA_DIR['log']}/rss/", file_log)
-                    log_file = helper.file.read_file(file_log_path)
+                for log_file_path, link in config.RSS_LIST.items():
+                    full_path = os.path.join(f"{config.DATA_DIR['log']}/rss/", log_file_path)
+                    log_file = helper.file.read_file(full_path)
 
                     links = parser(link, log_file)
 

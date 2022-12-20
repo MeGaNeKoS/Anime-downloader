@@ -23,7 +23,7 @@ def main():
     logger.info(f"Starting Anime Downloader...")
 
     threads = []
-    rss_thread = RSS(stop_event, share_var.queue_lock, share_var.waiting_queue)
+    rss_thread = RSS(stop_event, share_var.queue_lock, share_var.waiting_queue, config.RULES)
     rss_thread.start()
     threads.append(rss_thread)
 
@@ -31,6 +31,7 @@ def main():
 
     torrent_thread = Download(stop_event, share_var.queue_lock, share_var.waiting_queue)
     torrent_thread.start()
+    rss_thread.add_client(torrent_thread.get_lock(), torrent_thread.get_downloads())
     threads.append(torrent_thread)
 
     thread_status = [thread.is_alive() for thread in threads]

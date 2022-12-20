@@ -54,7 +54,7 @@ class Download(Thread):
                             self._remove_queue.pop(dtime)
 
                 # Give the other threads a chance to run
-                with self.queue_lock:
+                with self._lock, self.queue_lock:
                     # Avoid soft lock by looping with exact number of items
                     for _ in range(len(self.waiting_queue)):
                         if len(self._download_queue) < self._max_concurrent_downloads:
@@ -120,3 +120,14 @@ class Download(Thread):
                 # make sure it deleted after the torrent_on_finish finish its job
                 download.torrent_on_finish(self._lock, self.removal_time, self._download_queue, self._remove_queue)
 
+    """
+    New features, not used yet.
+    This feature is used in the validation of the RSS item before adding it to the queue.
+    Based on the number of client, it will wait until got all client's lock before checking the queue.
+    """
+
+    def get_lock(self) -> RLock:
+        return self._lock
+
+    def get_downloads(self) -> List[Torrent]:
+        return self._download_queue

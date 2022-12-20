@@ -18,9 +18,10 @@ def add_to_log(file_path: str, msg: str):
 
 def read_file(file_path: str) -> list:
     try:
-        if file_path not in _cache:
-            raise FileNotFoundError
         modified_time = os.stat(file_path).st_mtime
+        if file_path not in _cache:
+            _cache[file_path] = {'mTime': modified_time, 'log': []}
+            modified_time = 0
     except FileNotFoundError:
         modified_time = 0
         _cache[file_path] = {'mTime': modified_time, 'log': []}

@@ -56,4 +56,4 @@ class RSS(Thread):
 
             with self.queue_lock:
                 if manager.check(anime):
-                    self.waiting_queue.append(Torrent(anime, link, file_log))
+                    self.waiting_queue.append(Torrent(anime, link, file_log, title))

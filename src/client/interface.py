@@ -52,7 +52,7 @@ class TorrentInfo(dict):
 
 
 class Torrent:
-    def __init__(self, anime, url: list, file_log: str, remove_file: bool = False):
+    def __init__(self, anime, url: list, file_log: str, title: str, remove_file: bool = False):
         """
         :param anime: Anime dict
         :param url: list of url
@@ -62,6 +62,7 @@ class Torrent:
         self.anime = anime
         self.url = url
         self.log_file = file_log
+        self.title = title
 
         self.client: Union[Client, None] = None
         self.hash: str = ""
@@ -99,7 +100,8 @@ class Torrent:
             return True
         return False
 
-    def torrent_on_finish(self, lock: Union[Lock, RLock], removal_time: float, download_queue: list, remove_queue: dict) -> None:
+    def torrent_on_finish(self, lock: Union[Lock, RLock], removal_time: float, download_queue: list,
+                          remove_queue: dict) -> None:
         """
         Call when torrent is finished
         """
@@ -163,7 +165,8 @@ class Client(ABC):
         raise NotImplemented
 
     @abstractmethod
-    def torrent_on_finish(self, torrent: Torrent, lock: Lock, removal_time: float, download_queue: list, remove_queue: dict) -> None:
+    def torrent_on_finish(self, torrent: Torrent, lock: Lock, removal_time: float, download_queue: list,
+                          remove_queue: dict) -> None:
         """
         This function is called when the torrent is finished.
         """

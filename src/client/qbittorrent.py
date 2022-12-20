@@ -11,6 +11,7 @@ import qbittorrentapi
 from qbittorrentapi import TorrentInfoList, TorrentFilesList
 from qbittorrentapi.request import Request
 
+from src import helper
 from src.client.interface import Client, TorrentInfo, TorrentFile, Torrent
 
 logger = logging.getLogger(__name__)
@@ -227,10 +228,11 @@ class QBittorrent(Client):
         Do whatever you want when the torrent is finished.
         """
         logger.info("Starting post processing")
-        logger.info(f"Torrent data: {torrent.anime}")
+        logger.info(f"Torrent data: {torrent.title}")
         dtime = time.time() + removal_time
         with lock:
             # remove the torrent from the download queue immediately
+            helper.file.add_to_log(torrent.log_file, torrent.title)
             download_queue.remove(torrent)
             remove_queue[dtime] = torrent
         return
@@ -240,7 +242,7 @@ class QBittorrent(Client):
         Do whatever you want when the torrent is started.
         """
         logger.info("Starting pre processing")
-        logger.info(f"Torrent data: {torrent.anime}")
+        logger.info(f"Torrent data: {torrent.title}")
         return
 
     # client specific methods

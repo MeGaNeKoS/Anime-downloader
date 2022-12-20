@@ -1,28 +1,41 @@
 import logging
 import time
 import traceback
-from threading import Thread, Event
+from threading import Thread, Event, Lock, RLock
+from typing import List, Dict
 
 import devlog
 
 from src import config, helper
 from src.client import QBittorrent as Client
 from src.client.interface import TorrentInfo, Torrent
-from src.share_var import queue_lock, waiting_queue, downloading_queue, uploaded_queue
 
 logger = logging.getLogger(__name__)
 
 
 class Download(Thread):
-    def __init__(self, stop_event: Event):
+    """
+    This class is meant to be run in one instance. But it's possible to run multiple instance of this service.
+    The source of the RSS can be shared between multiple instance of this service.
+    """
+    def __init__(self, stop_event: Event, queue_lock: Lock, waiting_queue: list,
+                 removal_time: int = 0, max_download: int = 5, max_fail: int = 5):
         super().__init__()
         self.client = Client(*config.CLIENT_CONFIG_ARGS, **config.CLIENT_CONFIG_KWARGS)
         self.client.login()
         self.stop_event = stop_event
+        self.queue_lock = queue_lock
+        self.waiting_queue = waiting_queue
+        self.removal_time = removal_time
 
-        self._max_fail = 3
+        self._max_concurrent_downloads = max_download
+        self._download_queue: List[Torrent] = []
+        self._remove_queue: Dict[float, Torrent] = {}
+
+        self._max_fail = max_fail
         self._number_retries = 10
         self._max_delay_time_seconds = 60
+        self._lock = RLock()
 
     @devlog.log_on_error(trace_stack=True)
     def run(self):
@@ -31,25 +44,23 @@ class Download(Thread):
             try:
                 # test if the client is connected
                 self.client.connect()
-                with queue_lock:
+                with self._lock:
                     self.check_completion()
+                    for dtime, download in self._remove_queue.copy().items():
+                        if time.time() > dtime and download.remove_torrent():
+                            # just in case
+                            if download in self._download_queue:
+                                self._download_queue.remove(download)
+                            self._remove_queue.pop(dtime)
 
                 # Give the other threads a chance to run
-                with queue_lock:
+                with self.queue_lock:
                     # Avoid soft lock by looping with exact number of items
-                    for _ in range(len(waiting_queue)):
-                        if len(downloading_queue) < config.MAX_CONCURRENT_DOWNLOADS:
+                    for _ in range(len(self.waiting_queue)):
+                        if len(self._download_queue) < self._max_concurrent_downloads:
                             self.add_torrent()
                         else:
                             break
-
-                # Give the other threads a chance to run
-                with queue_lock:
-                    for dtime, download in uploaded_queue.copy().items():
-                        if time.time() > dtime and download.remove_torrent():
-                            if download in downloading_queue:
-                                downloading_queue.remove(download)
-                            uploaded_queue.pop(dtime)
 
                 logger.info(f"All download finished. "
                             f"Sleeping for {helper.duration_humanizer(config.SLEEP['download_check'])}")
@@ -76,7 +87,7 @@ class Download(Thread):
         This should be called with queue_lock acquired
         """
         try:
-            item: Torrent = waiting_queue.pop(0)
+            item: Torrent = self.waiting_queue.pop(0)
         except IndexError:
             return False
 
@@ -86,31 +97,26 @@ class Download(Thread):
         item.set_client(self.client)
         for _ in range(num_retries):
             if item.add_torrent():
-                downloading_queue.append(item)
+                self._download_queue.append(item)
                 return True
         else:
             item.fail += 1
             if item.fail >= self._max_fail:
                 logger.error(f"Failed to add torrent {item.anime} to client after {self._max_fail} tries. Skipping...")
                 return False
-            waiting_queue.append(item)
+            self.waiting_queue.append(item)
             return False
 
-    @staticmethod
-    def check_completion():
-        """
-        This should be called with queue_lock acquired
-        """
-        for download in downloading_queue:  # type: Torrent
+    def check_completion(self):
+        for download in self._download_queue:
             torrent: TorrentInfo = download.get_info()
 
             # remove non-existent torrents
             if not torrent:
-                uploaded_queue.append(download)
+                self._remove_queue[time.time()] = download
 
-            print(torrent)
             if torrent['status'] == 'complete':
                 torrent['status'] = 'uploading'
-                download.torrent_on_finish()
-                deletion_time = time.time() + config.UPLOAD_REMOVAl_TIME_SECONDS
-                uploaded_queue[deletion_time] = download
+                # make sure it deleted after the torrent_on_finish finish its job
+                download.torrent_on_finish(self._lock, self.removal_time, self._download_queue, self._remove_queue)
+

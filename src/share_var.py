@@ -184,8 +184,6 @@ class ThreadList(list):
 queue_lock = RLock()
 
 waiting_queue = ThreadList(queue_lock)  # Used in RSS, Download Thread
-downloading_queue = ThreadList(queue_lock)  # Used in RSS, Download Thread
-uploaded_queue = ThreadDict(queue_lock)  # Used in Download Thread
 
 # For general use, use the following lock.
 # Avoid using main_lock -> queue_lock -> main_lock as it will cause deadlock

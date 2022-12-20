@@ -2,8 +2,8 @@ import logging
 import threading
 import time
 
-from src import config
-from src.downloader.download import Download
+from src import config, share_var
+from src.downloader import Download
 from src.rss import RSS
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,11 @@ def main():
     logger.info(f"Starting Anime Downloader...")
 
     threads = []
-    rss_thread = RSS(stop_event)
+    rss_thread = RSS(stop_event, share_var.queue_lock, share_var.waiting_queue)
     rss_thread.start()
     threads.append(rss_thread)
 
-    torrent_thread = Download(stop_event)
+    torrent_thread = Download(stop_event, share_var.queue_lock, share_var.waiting_queue)
     torrent_thread.start()
     threads.append(torrent_thread)
 

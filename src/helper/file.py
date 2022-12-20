@@ -12,12 +12,14 @@ def add_to_log(file_path: str, msg: str):
 
     log = read_file(file_path)
     log.insert(0, msg)
-    log = log[config.MAX_LOG:]
+    log = log[:config.MAX_LOG]
     write_file(file_path, '\n'.join(log))
 
 
 def read_file(file_path: str) -> list:
     try:
+        if file_path not in _cache:
+            raise FileNotFoundError
         modified_time = os.stat(file_path).st_mtime
     except FileNotFoundError:
         modified_time = 0

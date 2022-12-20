@@ -16,43 +16,41 @@ from src.client.interface import Client, TorrentInfo, TorrentFile, Torrent
 
 logger = logging.getLogger(__name__)
 
-# This following code mean to add a delay time to the client's method before request to the application.
-# This is to prevent the client from being overloaded and ignoring the request,
-# especially when the client on heavy load.
 
-# This part only add cooldown whenever the Client class tries to make an API call. Since this is a global timer,
-# ideally we only sleep when we want to execute the request. Meanwhile, the code should continue the call preparation.
-# However, since I don't know where the request will be executed, I have to sleep somewhere before it executed.
-# This is not ideal, but it is the best I can do.
+def qbittorrent_activated_cooldown(event: threading.Event):
+    """
+    This following code mean to add a delay time to the client's method before request to the application.
+    This is to prevent the client from being overloaded and ignoring the request,
+    especially when the client on heavy load.
 
-# P.S: since the preparation is very fast, the performance impact is negligible.
+    This part only add cooldown whenever the Client class tries to make an API call. Since this is a global timer,
+    ideally we only sleep when we want to execute the request. Meanwhile, the code should continue the call preparation.
+    However, since I don't know where the request will be executed, I have to sleep somewhere before it executed.
+    This is not ideal, but it is the best I can do.
 
-# Every client can behave differently. Only implement this class when you need it.
-# Note: I chose the `_request_manager` method because based on observation this is the entry point for API calls.
-# My observation may be wrong, so if you find a better way to do this (the actual method that execute the call),
-# please let me know. As it can improve the performance of the client. a little.
+    P.S: since the preparation is very fast, the performance impact is negligible.
 
+    Every client can behave differently. Only implement this class when you need it.
+    Note: I chose the `_request_manager` method because based on observation this is the entry point for API calls.
+    My observation may be wrong, so if you find a better way to do this (the actual method that execute the call),
+    please let me know. As it can improve the performance of the client. a little.
+    """
 
-original_request = Request._request_manager
+    original_request = Request._request_manager
 
-COOLDOWN_LAST_CALL = 0
-COOLDOWN_TIMER = 0.2
+    cooldown_last_call = 0
+    cooldown_timer = 0.2
 
+    def _delayed_request_manager(*args, **kwargs):
+        # Wait until the COOLDOWN_TIMER time has passed
+        nonlocal cooldown_last_call
+        current_time = time.time()
+        elapsed_time = current_time - cooldown_last_call
+        event.wait(max(0., cooldown_timer - elapsed_time))
+        cooldown_last_call = time.time()
+        return original_request(*args, **kwargs)
 
-def _delayed_request_manager(*args, **kwargs):
-    # Wait until the COOLDOWN_TIMER time has passed
-    global COOLDOWN_LAST_CALL
-    current_time = time.time()
-    elapsed_time = current_time - COOLDOWN_LAST_CALL
-    time.sleep(max(0., COOLDOWN_TIMER - elapsed_time))
-    COOLDOWN_LAST_CALL = time.time()
-    return original_request(*args, **kwargs)
-
-
-Request._request_manager = functools.singledispatch(_delayed_request_manager)
-
-
-# End of cooldown implementation
+    Request._request_manager = functools.singledispatch(_delayed_request_manager)
 
 
 class QBittorrent(Client):
@@ -64,12 +62,16 @@ class QBittorrent(Client):
         self._default_category = None
         self._default_tag = None
         self._lock = threading.RLock()  # Required on multithreading applications
+        self._event = threading.Event()
 
         # This is necessary because the Qbittorrent takes some time to update the information. Especially on heavy load.
         self._number_retries = 10
         self._wait_time_second = 0.2  # wait time before each operation.
         self._max_wait_time_seconds = 10
         self.client: qbittorrentapi.Client = qbittorrentapi.Client(*args, **kwargs)
+
+    def set_event(self, event: threading.Event):
+        self._event = event
 
     # Utility methods
     @classmethod
@@ -190,7 +192,9 @@ class QBittorrent(Client):
                             return data["hash"]
 
                 # wait before retry
-                time.sleep(self._wait_time_second)
+                self._event.wait(self._wait_time_second)
+                if self._event.is_set():
+                    break
         return ""
 
     def get_torrent_info(self, torrent_hash: str = None, tags=None, category=None) -> TorrentInfo:
@@ -202,7 +206,9 @@ class QBittorrent(Client):
                         return self._populate_torrent_info(entries, 1)[0]
                 except qbittorrentapi.APIError as e:
                     logger.error(f"Could not get torrent information: {e}")
-                    time.sleep(self._wait_time_second)
+                    self._event.wait(self._wait_time_second)
+                    if self._event.is_set():
+                        break
                 except Exception as e:
                     logger.error(f"Could not get torrent information: {e}")
                     return TorrentInfo()
@@ -218,7 +224,9 @@ class QBittorrent(Client):
                     return True
 
             # let it in with statement to give a gap between failed attempts
-            time.sleep(self._wait_time_second)
+            self._event.wait(self._wait_time_second)
+            if self._event.is_set():
+                break
         return False
 
     # Event behavior methods

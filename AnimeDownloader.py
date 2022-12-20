@@ -3,6 +3,7 @@ import threading
 import time
 
 from src import config, share_var
+from src.client import qbittorrent_activated_cooldown
 from src.downloader import Download
 from src.rss import RSS
 
@@ -25,6 +26,8 @@ def main():
     rss_thread = RSS(stop_event, share_var.queue_lock, share_var.waiting_queue)
     rss_thread.start()
     threads.append(rss_thread)
+
+    qbittorrent_activated_cooldown(stop_event)
 
     torrent_thread = Download(stop_event, share_var.queue_lock, share_var.waiting_queue)
     torrent_thread.start()

@@ -59,7 +59,7 @@ class QBittorrent(Client):
         """
         Initialize the client. Any parameter is passed to the real client.
         """
-        self._default_category = None
+        self._default_category = "AnimeDownloader"
         self._default_tag = None
         self._lock = threading.RLock()  # Required on multithreading applications
         self._event = threading.Event()

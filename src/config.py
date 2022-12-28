@@ -20,6 +20,7 @@ LEGALIZE_CHARACTER = {':': '：',  # colon to full-width colon
 LOG_FILE = {
     "rss": "rss.log",
     "download": "download.log",
+    "main": "app.log",
 }
 
 MAX_CONCURRENT_DOWNLOADS = 6
@@ -30,12 +31,14 @@ RELEASE_GROUP = ('rom & rem',  # consistent but not much anime they have, and al
                  'hr',  # Good size, have chapter, Good anime name formate
                  'hakata ramen',  # Good size, have chapter, Good anime name formate
                  'judas',  # recognizable file name, have a lot of release
+                 "amzero", # Good size, AV1, no chapter, but better thatn asw
                  'asw',  # No chapter :(, have a lot of release
                  'anime time',  # No chapter :(
                  'animerg'  # some of their release are 8 bit
                  )  # order is represent the priority, highest to lowest
 
 RSS_LIST = {
+    "amzero": "https://feed.animetosho.org/rss2?only_tor=1&q=amzero+1080",
     "rom & rem 1080.txt": "https://feed.animetosho.org/rss2?only_tor=1&q=Rom+%26+Rem+1080",
     # "animerg 1080.txt": "https://feed.animetosho.org/rss2?only_tor=1&q=AnimeRG+1080",
     "asw 1080.txt": "https://feed.animetosho.org/rss2?only_tor=1&q=ASW+1080",
@@ -72,3 +75,22 @@ CLIENT_CONFIG_ARGS = ("localhost", 8080, "admin", "adminadmin")
 CLIENT_CONFIG_KWARGS = {}
 
 UPLOAD_REMOVAl_TIME_SECONDS = 0  # 0 means immediate remove
+
+
+FOLDER_PATH = {
+    "Anime": {
+        "0season": r"H:\My Drive\Anime\Unsorted\0 Season",
+        "movie": r"H:\My Drive\Anime\Movie",
+        "ona": r"H:\My Drive\Anime\ONA",
+        "ova": r"H:\My Drive\Anime\OVA",
+        "special": r"H:\My Drive\Anime\Special",
+        "music": r"H:\My Drive\Anime\MUSIC",
+        "tv": r"H:\My Drive\Anime\TV",
+        "unknown": r"H:\My Drive\Anime\Unsorted\Torrent",
+        "id": r"H:\My Drive\Anime"
+    }
+}
+
+# Discord stuff
+OWNER = ""  # Owner's discord id
+DISCORD_NOTIF = "./data/discord_notif.txt"

@@ -1,3 +1,4 @@
+import ctypes
 import logging
 import os.path
 import traceback
@@ -49,23 +50,41 @@ class RSS(Thread):
 
                     self.add_to_queue(links, full_path)
 
+                full_path = f"{config.DATA_DIR['log']}/rss/animetosho"
+                log_file = helper.file.read_file(full_path)
+                links = parser("https://feed.animetosho.org/rss2?only_tor=1&q=1080p",
+                               log_file)
+                self.add_to_queue(links, full_path, force=True)
                 logger.info(f"All rss downloaded. Sleeping for {helper.duration_humanizer(config.SLEEP['rss_check'])}")
                 self.stop_event.wait(config.SLEEP["rss_check"])
+            except KeyboardInterrupt:
+                break
             except Exception as e:
                 with open(config.LOG_FILE['rss'], "a+") as f:
                     f.write(f"{e}\n{traceback.format_exc()}")
                 self.stop_event.wait(10)  # timout before retrying
 
-    def add_to_queue(self, links: dict, file_log: str) -> None:
+    def get_id(self):
+        return self.ident
+
+    def raise_exception(self):
+        thread_id = self.get_id()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id,
+                                                         ctypes.py_object(KeyboardInterrupt))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+            print('Exception raise failure')
+
+    def add_to_queue(self, links: dict, file_log: str, force=False) -> None:
         for title, link in links.items():
             if title in file_log:
                 continue
 
             anime = helper.parse(title, True)
 
-            self.validator(anime, link, file_log, title)
+            self.validator(anime, link, file_log, title, force)
 
-    def validator(self, anime, link, file_log, title) -> None:
+    def validator(self, anime, link, file_log, title, force=False) -> None:
         """
         In this project, the anime rule are follow.
         If it's unknown, it will be added to the waiting queue.
@@ -82,8 +101,15 @@ class RSS(Thread):
         - Otherwise the old one will be removed
         """
 
-        if self.rule_manager.check(anime):
+        if self.rule_manager.check(anime) or force:
             # If the anime unrecognized, we will add it to the waiting queue
+            anime["release_group"] = anime.get("release_group", "animetosho_fast_update")
+            if force:
+                if anime["release_group"].lower() not in config.RELEASE_GROUP:
+                    anime["force"] = True
+                    if anime.get("anilist", 0) == 0 or anime.get("anime_type", "torrent") == "torrent":
+                        return
+
             if anime.get("anime_type", "unknown").lower() == "unknown" or anime.get("anilist", 0) == 0:
                 with self.queue_lock:
                     self.waiting_queue.append(Torrent(anime, link, file_log, title))
@@ -91,7 +117,7 @@ class RSS(Thread):
 
             # uncensored will take over the censored version
             uncensored = "uncensored" in str(anime.get("other", "")).lower()
-            identifier = f"{anime['anilist']}{anime['episode']}"
+            identifier = f"{anime['anilist']}{anime.get('episode_number', 0)}"
 
             # Extended check. Make sure the torrent is not in the waiting queue
             with self.queue_lock:
@@ -100,14 +126,15 @@ class RSS(Thread):
                     existing_identifier = f"{existing_anime['anilist']}{existing_anime.get('episode_number', 0)}"
                     if identifier == existing_identifier:
                         if not helper.should_download(anime, existing_anime, uncensored):
-                            helper.file.add_to_log(file_log, title)
+                            if file_log not in torrent.log_file:
+                                torrent.log_file.append(file_log)
                             return
                         # the new torrent is better, remove the old one
                         self.waiting_queue.remove(torrent)
 
                         # should we break? because in the intended use case,
                         # there's should only one identifier in the waiting queue
-                        break
+                        # break
 
             # Extend Check. Make sure the torrent is not in the download queue
             for lock, downloads in self.clients:
@@ -117,15 +144,16 @@ class RSS(Thread):
                         existing_identifier = f"{existing_anime['anilist']}{existing_anime.get('episode_number', 0)}"
                         if identifier == existing_identifier:
                             if not helper.should_download(anime, existing_anime, uncensored):
-                                helper.file.add_to_log(file_log, title)
+                                if file_log not in torrent.log_file:
+                                    torrent.log_file.append(file_log)
                                 return
                             # the new torrent is better, remove the old one
-                            # download.remove_torrent()
-                            downloads.remove(download)
+                            if download.remove_torrent():
+                                downloads.remove(download)
 
                             # should we break? because in the intended use case,
                             # there's should only one identifier in the download queue
-                            break
+                            # break
 
             # Check the fansub preference from the database
             from_db = database.db.select("preference", {"anime_id": anime["anilist"]})
@@ -151,7 +179,21 @@ class RSS(Thread):
                         from_db[0]["release_group"] = anime["release_group"]
                         database.db.insert("preference", from_db[0])
 
-            else:
+                if force:
+                    try:
+                        if anime.get("release_group", "").lower() not in config.RELEASE_GROUP:
+                            if int(from_db[0]["last_episode"] or 0) >= int(anime.get("episode_number", 0)):
+                                helper.file.add_to_log([file_log], title)
+                                return
+                    except Exception:
+                        return
+
+                if isinstance(anime.get("episode_number", 0), list):
+                    from_db[0]["last_episode"] = anime.get("episode_number", 0)[-1]
+                else:
+                    from_db[0]["last_episode"] = anime.get("episode_number", 0)
+                database.db.insert("preference", from_db[0])
+            else:  # if from_db
                 # if the preference is empty,
                 # then create new preference entry
                 to_db = {

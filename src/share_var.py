@@ -183,7 +183,7 @@ class ThreadList(list):
 # Any thread requesting to access the following variables must acquire this lock first
 queue_lock = RLock()
 
-waiting_queue = ThreadList(queue_lock)  # Used in RSS, Download Thread
+waiting_queue = []  # Used in RSS, Download Thread
 
 # For general use, use the following lock.
 # Avoid using main_lock -> queue_lock -> main_lock as it will cause deadlock

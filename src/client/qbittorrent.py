@@ -5,14 +5,17 @@ import os
 import re
 import threading
 import time
-from typing import List
+from typing import List, Union
 
+import devlog
 import qbittorrentapi
+from pymediainfo import MediaInfo
 from qbittorrentapi import TorrentInfoList, TorrentFilesList
 from qbittorrentapi.request import Request
 
 from src import helper
 from src.client.interface import Client, TorrentInfo, TorrentFile, Torrent
+from src.ffmpeg import ffmpeg
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +73,22 @@ class QBittorrent(Client):
         self._max_wait_time_seconds = 10
         self.client: qbittorrentapi.Client = qbittorrentapi.Client(*args, **kwargs)
 
+        self.manual_category = "manual_download"
+        self.manual_track_tags = "track"
+        self.check_progress = "checking"
+        self.check_request = "check"
+        self.recheck_request = "recheck"
+
     def set_event(self, event: threading.Event):
         self._event = event
+
+    @staticmethod
+    def run_in_thread(func):
+        def wrapper(*args, **kwargs):
+            thread = threading.Thread(target=func, args=args, kwargs=kwargs, daemon=True)
+            thread.start()
+
+        return wrapper
 
     # Utility methods
     @classmethod
@@ -197,7 +214,24 @@ class QBittorrent(Client):
                     break
         return ""
 
-    def get_torrent_info(self, torrent_hash: str = None, tags=None, category=None) -> TorrentInfo:
+    def get_torrents(self, torrent_hash: str = None, tags=None, category=None) -> List[TorrentInfo]:
+        for _ in range(self._number_retries):
+            with self._lock:
+                try:
+                    entries = self.client.torrents_info(torrent_hashes=torrent_hash, tag=tags, category=category)
+                    if entries:
+                        return self._populate_torrent_info(entries)
+                except qbittorrentapi.APIError as e:
+                    logger.error(f"Could not get torrent information: {e}")
+                    self._event.wait(self._wait_time_second)
+                    if self._event.is_set():
+                        break
+                except Exception as e:
+                    logger.error(f"Could not get torrent information: {e}")
+                    return []
+        return []
+
+    def get_torrent_info(self, torrent_hash: str = None, tags=None, category=None) -> Union[TorrentInfo, None]:
         for _ in range(self._number_retries):
             with self._lock:
                 try:
@@ -211,8 +245,8 @@ class QBittorrent(Client):
                         break
                 except Exception as e:
                     logger.error(f"Could not get torrent information: {e}")
-                    return TorrentInfo()
-        return TorrentInfo()
+                    return None
+        return None
 
     def remove_torrent(self, torrent_hash: str, delete_files: bool) -> bool:
         for i in range(self._number_retries):
@@ -230,6 +264,7 @@ class QBittorrent(Client):
         return False
 
     # Event behavior methods
+    @run_in_thread
     def torrent_on_finish(self, torrent: Torrent, lock: threading.Lock,
                           removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
@@ -237,23 +272,126 @@ class QBittorrent(Client):
         """
         logger.info("Starting post processing")
         logger.info(f"Torrent data: {torrent.title}")
+
+        torrents = torrent.get_info()
+        status = []
+        file8bit = False
+        file_format = ""
+        existing_root = {}
+        for torrent_file in torrents['files']:  # type: TorrentFile
+            # skip not downloaded files
+            if not torrent_file['downloaded']:
+                continue
+
+            try:
+                m_info = MediaInfo.parse(os.path.join(torrents["save_path"], torrent_file["name"]))
+                for track in m_info.tracks:
+                    if track.track_type.lower() == 'video':
+                        if track.bit_depth == 8:
+                            file8bit = True
+                        elif track.format != "HEVC":
+                            file_format = track.format
+            except Exception:
+                pass
+
+            status.append(upload(torrents["save_path"],
+                                 torrent_file['folder_path'],
+                                 torrent_file['name'],
+                                 track=torrent.track,
+                                 existing_root=existing_root,
+                                 force=torrent.anime.get("force", False)))
+        if all(status):
+            logger.info(f"{torrent.title} uploaded")
+            mention_owner = False
+            notif_text = ""
+            if file8bit:
+                mention_owner = True
+                notif_text += "[8bit] "
+            if file_format:
+                mention_owner = True
+                notif_text += f"[{file_format}] "
+            notif_text += f"{torrent.title} uploaded"
+            helper.discord_user_notif(notif_text, mention_owner)
+        else:
+            logger.info(f"{torrent.title} upload failed")
+
         dtime = time.time() + removal_time
         with lock:
+            logger.info(f"removing {torrent.title} in {removal_time} seconds")
             # remove the torrent from the download queue immediately
             helper.file.add_to_log(torrent.log_file, torrent.title)
-            download_queue.remove(torrent)
+            if torrent in download_queue:
+                download_queue.remove(torrent)
             remove_queue[dtime] = torrent
         return
 
-    def torrent_on_start(self, torrent: Torrent) -> None:
+    @run_in_thread
+    def torrent_on_start(self, torrent: Torrent, lock: Union[threading.Lock, threading.RLock],
+                         removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         Do whatever you want when the torrent is started.
         """
         logger.info("Starting pre processing")
         logger.info(f"Torrent data: {torrent.title}")
+        tags = [self.check_progress]
+        if self.torrent_add_tags(torrent.hash, tags):
+            torrents = torrent.get_info()
+            while not torrents['files'] and torrents['status'] != "complete":
+                time.sleep(1)
+                torrents = torrent.get_info()
+
+            downloaded = []
+            existing_root = {}
+            for torrent_file in torrents['files']:  # type: TorrentFile
+                folder_path = torrent_file['folder_path']
+                torrent_path = folder_path.split(os.sep)  # type: list
+                file_name = torrent_file['name']
+
+                no_download, remove_list, save_path = helper.check_file(file_name, torrent_path, existing_root, torrent.track)
+
+                for file in remove_list:
+                    try:
+                        os.remove(os.path.join(save_path, file))
+                    except FileNotFoundError:
+                        pass
+                    except Exception as e:
+                        logger.error(f"Could not remove file {file}: {e}")
+
+                if no_download:
+                    self.torrent_file_priority(torrent.hash, torrent_file['identifier'], 0)
+                    downloaded.append(False)
+                else:
+                    self.torrent_file_priority(torrent.hash, torrent_file['identifier'], 1)
+                    downloaded.append(True)
+
+            if not any(downloaded):
+                # torrent.remove_torrent()
+                with lock:
+                    if torrent in download_queue:
+                        download_queue.remove(torrent)
+                helper.file.add_to_log(torrent.log_file, torrent.title)
+                return
+
+            self.torrent_remove_tag(torrent.hash, tags, False)
         return
 
     # client specific methods
+    def torrent_add_tags(self, torrent_hash: str, tags: list) -> bool:
+        for _ in range(self._number_retries):
+            with self._lock:
+                self.client.torrents_add_tags(torrent_hashes=torrent_hash, tags=tags)
+
+                data = self.get_torrent_info(torrent_hash)
+                if not data:
+                    continue
+                for tag in tags:
+                    if tag in data['tags']:
+                        continue
+                    break
+                else:
+                    return True
+        return False
+
     def torrent_remove_tag(self, torrent_hash: str, tags: list, delete=False) -> bool:
         """
         Delete mean delete the tag itself. Otherwise, it will just remove the tag from the torrent.
@@ -273,3 +411,50 @@ class QBittorrent(Client):
                 else:
                     return True
         return False
+
+    def torrent_file_priority(self, torrent_hash: str, file_id: int, priority: int) -> bool:
+        for _ in range(self._number_retries):
+            with self._lock:
+                self.client.torrents_file_priority(torrent_hash, file_id, priority)
+                return True
+        return False
+
+
+@devlog.log_on_error(trace_stack=True)
+def upload(local_save_path, folder_path, file_name, *, existing_root=None, track=True, num_retries=10,
+           force=False) -> bool:
+    if existing_root is None:
+        existing_root = {}
+    # normalize the path to match this os
+    torrent_path = folder_path.split(os.sep)  # type: list
+    local_save_path = os.path.normpath(local_save_path)
+    no_download, remove_list, save_path = helper.check_file(file_name, torrent_path, existing_root, track)
+
+    if no_download:
+        for file in remove_list:
+            try:
+                os.remove(os.path.join(save_path, file))
+            except FileNotFoundError:
+                pass
+        return True
+
+    # upload the file
+    if force:
+        name, ext = os.path.splitext(file_name)
+        uploaded_name = f'{name}[AnimeTosho Fast Upload]{ext}'
+        archive_save_path = os.path.join(save_path, uploaded_name)
+    else:
+        archive_save_path = os.path.join(save_path, file_name)
+
+    local_file_path = os.path.join(local_save_path, folder_path, file_name)
+    for _ in range(num_retries):
+        if ffmpeg.copy(local_file_path, archive_save_path):
+            for file in remove_list:
+                try:
+                    os.remove(os.path.join(save_path, file))
+                except FileNotFoundError:
+                    pass
+            break
+    else:
+        return False
+    return True

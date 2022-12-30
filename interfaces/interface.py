@@ -56,18 +56,21 @@ class Torrent:
         """
         :param anime: Anime dict
         :param url: list of url
-        :param file_log: path to file log
+        :param file_log: list of path to the file log
         :param remove_file: remove torrent file if this torrent is removed
         """
         self.anime = anime
         self.url = url
-        self.log_file = file_log
+        self.log_file: list = [file_log]
         self.title = title
 
         self.client: Union[Client, None] = None
         self.hash: str = ""
         self.fail = 0
         self.remove_file = remove_file
+        self.status = "waiting"
+        self.client_data = {}
+        self.track = True
 
     def set_client(self, client: 'Client') -> None:
         """
@@ -79,22 +82,38 @@ class Torrent:
         """
         Get the information of the torrent.
         """
-        return self.client.get_torrent_info(self.hash)
+        result = self.client.get_torrent_info(self.hash)
+        if self.status != "finished":
+            if result:
+                self.status = result["status"]
+        return result
 
-    def add_torrent(self) -> bool:
+    def add_torrent(self, lock: Union[Lock, RLock], removal_time: float, download_queue: list,
+                    remove_queue: dict) -> bool:
         """
         Add torrent to client
         """
-        self.hash = self.client.add_torrent(self)
+        if not self.hash:
+            self.hash = self.client.add_torrent(self)
         if self.hash:
             # Call when torrent is added successfully
-            self.client.torrent_on_start(self)
+            self.client.torrent_on_start(self, lock, removal_time, download_queue, remove_queue)
             return True
         return False
 
+    def cancel_download(self) -> bool:
+        """
+        Cancel download. If the torrent is already completed, then it will not be removed.
+        Because it possible it's doing the on_finish event.
+        """
+        anime = self.get_info()
+        if anime['status'] == 'complete':
+            return False
+        return self.remove_torrent()
+
     def remove_torrent(self) -> bool:
         """
-        Remove torrent from client
+        Remove torrent from client.
         """
         if self.client.remove_torrent(self.hash, self.remove_file):
             return True
@@ -158,7 +177,8 @@ class Client(ABC):
 
     # Event behavior methods
     @abstractmethod
-    def torrent_on_start(self, torrent: Torrent) -> None:
+    def torrent_on_start(self,  torrent: Torrent, lock: Lock, removal_time: float, download_queue: list,
+                         remove_queue: dict) -> None:
         """
         This function is called when the torrent is added to the client.
         """

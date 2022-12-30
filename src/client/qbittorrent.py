@@ -5,14 +5,14 @@ import os
 import re
 import threading
 import time
-from typing import List
+from typing import List, Union
 
 import qbittorrentapi
 from qbittorrentapi import TorrentInfoList, TorrentFilesList
 from qbittorrentapi.request import Request
 
 from src import helper
-from src.client.interface import Client, TorrentInfo, TorrentFile, Torrent
+from interfaces.interface import Client, TorrentInfo, TorrentFile, Torrent
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,14 @@ class QBittorrent(Client):
 
     def set_event(self, event: threading.Event):
         self._event = event
+
+    @staticmethod
+    def run_in_thread(func):
+        def wrapper(*args, **kwargs):
+            thread = threading.Thread(target=func, args=args, kwargs=kwargs, daemon=True)
+            thread.start()
+
+        return wrapper
 
     # Utility methods
     @classmethod
@@ -197,7 +205,7 @@ class QBittorrent(Client):
                     break
         return ""
 
-    def get_torrent_info(self, torrent_hash: str = None, tags=None, category=None) -> TorrentInfo:
+    def get_torrent_info(self, torrent_hash: str = None, tags=None, category=None) -> Union[TorrentInfo, None]:
         for _ in range(self._number_retries):
             with self._lock:
                 try:
@@ -211,8 +219,8 @@ class QBittorrent(Client):
                         break
                 except Exception as e:
                     logger.error(f"Could not get torrent information: {e}")
-                    return TorrentInfo()
-        return TorrentInfo()
+                    return None
+        return None
 
     def remove_torrent(self, torrent_hash: str, delete_files: bool) -> bool:
         for i in range(self._number_retries):
@@ -230,6 +238,7 @@ class QBittorrent(Client):
         return False
 
     # Event behavior methods
+    @run_in_thread
     def torrent_on_finish(self, torrent: Torrent, lock: threading.Lock,
                           removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
@@ -241,11 +250,14 @@ class QBittorrent(Client):
         with lock:
             # remove the torrent from the download queue immediately
             helper.file.add_to_log(torrent.log_file, torrent.title)
-            download_queue.remove(torrent)
+            if torrent in download_queue:
+                download_queue.remove(torrent)
             remove_queue[dtime] = torrent
         return
 
-    def torrent_on_start(self, torrent: Torrent) -> None:
+    @run_in_thread
+    def torrent_on_start(self, torrent: Torrent, lock: Union[threading.Lock, threading.RLock],
+                         removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         Do whatever you want when the torrent is started.
         """

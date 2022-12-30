@@ -239,7 +239,7 @@ class QBittorrent(Client):
 
     # Event behavior methods
     @run_in_thread
-    def torrent_on_finish(self, torrent: Torrent, lock: threading.Lock,
+    def torrent_on_finish(self, torrent: Torrent, lock: threading.RLock,
                           removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         Do whatever you want when the torrent is finished.
@@ -256,7 +256,7 @@ class QBittorrent(Client):
         return
 
     @run_in_thread
-    def torrent_on_start(self, torrent: Torrent, lock: Union[threading.Lock, threading.RLock],
+    def torrent_on_start(self, torrent: Torrent, lock: threading.RLock,
                          removal_time: float, download_queue: list, remove_queue: dict) -> None:
         """
         Do whatever you want when the torrent is started.
@@ -266,6 +266,22 @@ class QBittorrent(Client):
         return
 
     # client specific methods
+    def torrent_add_tags(self, torrent_hash: str, tags: list) -> bool:
+        for _ in range(self._number_retries):
+            with self._lock:
+                self.client.torrents_add_tags(torrent_hashes=torrent_hash, tags=tags)
+
+                data = self.get_torrent_info(torrent_hash)
+                if not data:
+                    continue
+                for tag in tags:
+                    if tag in data['tags']:
+                        continue
+                    break
+                else:
+                    return True
+        return False
+
     def torrent_remove_tag(self, torrent_hash: str, tags: list, delete=False) -> bool:
         """
         Delete mean delete the tag itself. Otherwise, it will just remove the tag from the torrent.

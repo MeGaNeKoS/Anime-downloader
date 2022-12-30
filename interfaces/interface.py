@@ -78,7 +78,7 @@ class Torrent:
         """
         self.client = client
 
-    def get_info(self) -> TorrentInfo:
+    def get_info(self) -> Union[TorrentInfo, None]:
         """
         Get the information of the torrent.
         """
@@ -88,7 +88,7 @@ class Torrent:
                 self.status = result["status"]
         return result
 
-    def add_torrent(self, lock: Union[Lock, RLock], removal_time: float, download_queue: list,
+    def add_torrent(self, lock: RLock, removal_time: float, download_queue: list,
                     remove_queue: dict) -> bool:
         """
         Add torrent to client
@@ -159,7 +159,7 @@ class Client(ABC):
         raise NotImplemented
 
     @abstractmethod
-    def get_torrent_info(self, torrent_hash: str) -> TorrentInfo:
+    def get_torrent_info(self, torrent_hash: str) -> Union[TorrentInfo, None]:
         """
         Get the information of a torrent.
         This function returns a dictionary with the information of the torrent.
@@ -177,7 +177,7 @@ class Client(ABC):
 
     # Event behavior methods
     @abstractmethod
-    def torrent_on_start(self,  torrent: Torrent, lock: Lock, removal_time: float, download_queue: list,
+    def torrent_on_start(self,  torrent: Torrent, lock: RLock, removal_time: float, download_queue: list,
                          remove_queue: dict) -> None:
         """
         This function is called when the torrent is added to the client.
@@ -185,7 +185,7 @@ class Client(ABC):
         raise NotImplemented
 
     @abstractmethod
-    def torrent_on_finish(self, torrent: Torrent, lock: Lock, removal_time: float, download_queue: list,
+    def torrent_on_finish(self, torrent: Torrent, lock: RLock, removal_time: float, download_queue: list,
                           remove_queue: dict) -> None:
         """
         This function is called when the torrent is finished.

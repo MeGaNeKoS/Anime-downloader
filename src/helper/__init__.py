@@ -1,6 +1,7 @@
 from deps.recognition import recognition
-from src import config
 from src.helper import file
+
+_legalize_char = {}
 
 
 def duration_humanizer(second: int):
@@ -35,12 +36,15 @@ def legalize(filename: str):
     """
     if filename is None:
         return
-    for illegal, escaped in config.LEGALIZE_CHARACTER.items():
+    for illegal, escaped in _legalize_char.items():
         filename = filename.replace(illegal, escaped)
     return filename
 
 
 def parse(file_name, track):
+    """
+    Parse file name and return a dict of parsed result
+    """
     if track:
         anime = recognition.track(file_name)
     else:
@@ -49,3 +53,8 @@ def parse(file_name, track):
         anime["anime_type"] = "unknown"
 
     return anime
+
+
+def set_legalize_char(legalize_char: dict):
+    global _legalize_char
+    _legalize_char = legalize_char
